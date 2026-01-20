@@ -6,8 +6,9 @@ import Navbar from "./components/Navbar";
 // 2. Import Halaman-Halaman (yang isinya ganti-ganti)
 // Pastikan file-file ini sudah kamu buat di folder src/pages/ ya!
 import Home from "./pages/Home";
-import Login from "./pages/Login"; 
 import Recommendation from "./pages/Recommendation";
+import Login from "./pages/Login"; 
+import Register from "./pages/Register";
 
 export default function App() {
   return (
@@ -28,6 +29,8 @@ export default function App() {
         
         {/* Kalau buka website.com/recommendation -> Tampilkan halaman Recommendation */}
         <Route path="/recommendation" element={<Recommendation />} />
+
+        <Route path="/register" element={<Register />} />
 
         {/* Kalau link ngawur -> Tampilkan 404 */}
         <Route path="*" element={<div className="pt-32 text-center font-bold">404 - Page Not Found</div>} />
