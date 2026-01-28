@@ -9,6 +9,7 @@ import Home from "./pages/Home";
 import Recommendation from "./pages/Recommendation";
 import Login from "./pages/Login"; 
 import Register from "./pages/Register";
+import CreateProfile from "./pages/CreateProfile";
 
 export default function App() {
   return (
@@ -31,6 +32,8 @@ export default function App() {
         <Route path="/recommendation" element={<Recommendation />} />
 
         <Route path="/register" element={<Register />} />
+
+        <Route path="/create-profile" element={<CreateProfile />} />
 
         {/* Kalau link ngawur -> Tampilkan 404 */}
         <Route path="*" element={<div className="pt-32 text-center font-bold">404 - Page Not Found</div>} />
