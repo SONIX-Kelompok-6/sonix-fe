@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import logoImg from '../assets/logo-dark.png'; 
+// Import sudah benar (.svg)
+import logoImg from '../assets/logo-dark.svg'; 
 
 export default function Navbar() {
-  // State untuk buka/tutup menu mobile
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const menuItems = [
@@ -29,25 +29,27 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* 2. DESKTOP MENU (Hidden di HP) */}
+        {/* 2. DESKTOP MENU */}
         <div className="hidden md:flex items-center gap-8">
           {menuItems.map((item) => (
             <Link
               key={item.name}
               to={item.path}
-              className="text-sm font-semibold text-slate-600 transition hover:text-blue-600 hover:underline hover:underline-offset-4"
+              // PERBAIKAN: slate -> gray
+              className="text-sm font-semibold text-gray-600 transition hover:text-blue-600 hover:underline hover:underline-offset-4"
             >
               {item.name}
             </Link>
           ))}
         </div>
 
-        {/* 3. RIGHT SECTION (Search + Login + Hamburger) */}
+        {/* 3. RIGHT SECTION */}
         <div className="flex items-center gap-4">
           
-          {/* Search Bar (Hidden di Mobile) */}
+          {/* Search Bar */}
           <div className="relative hidden lg:block">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+            {/* PERBAIKAN: slate -> gray */}
+            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
               </svg>
@@ -55,7 +57,8 @@ export default function Navbar() {
             <input
               type="text"
               placeholder="Search..."
-              className="w-80 rounded-full bg-slate-200/50 py-2 pl-9 pr-4 text-sm font-medium text-slate-700 placeholder-slate-400 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              // PERBAIKAN: slate -> gray
+              className="w-80 rounded-full bg-gray-200/50 py-2 pl-9 pr-4 text-sm font-medium text-gray-700 placeholder-gray-400 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
 
@@ -66,18 +69,17 @@ export default function Navbar() {
             Login
           </Link>
 
-          {/* --- TOMBOL HAMBURGER (Hanya muncul di HP/md:hidden) --- */}
+          {/* HAMBURGER BUTTON */}
           <button 
-            className="md:hidden p-2 text-slate-600 transition hover:text-blue-600"
+            // PERBAIKAN: slate -> gray
+            className="md:hidden p-2 text-gray-600 transition hover:text-blue-600"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
             {isMenuOpen ? (
-              // Icon X (Close)
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-6 w-6">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
               </svg>
             ) : (
-              // Icon Garis 3 (Hamburger)
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-6 w-6">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
               </svg>
@@ -85,15 +87,16 @@ export default function Navbar() {
           </button>
         </div>
 
-        {/* --- MOBILE MENU DROPDOWN --- */}
+        {/* MOBILE MENU */}
         {isMenuOpen && (
           <div className="absolute top-full left-0 mt-2 w-full origin-top-right rounded-2xl bg-white/90 p-4 shadow-xl backdrop-blur-xl border border-white/20 md:hidden flex flex-col gap-4 animate-in fade-in slide-in-from-top-5">
              {menuItems.map((item) => (
                 <Link
                   key={item.name}
                   to={item.path}
-                  onClick={() => setIsMenuOpen(false)} // Tutup menu pas diklik
-                  className="block rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-blue-50 hover:text-blue-600"
+                  onClick={() => setIsMenuOpen(false)}
+                  // PERBAIKAN: slate -> gray
+                  className="block rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-blue-50 hover:text-blue-600"
                 >
                   {item.name}
                 </Link>
