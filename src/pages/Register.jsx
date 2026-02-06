@@ -96,7 +96,7 @@ export default function Register() {
   return (
     <>
       {/* 1. CONTAINER: pt-20 (Compact Version - Layout TETAP) */}
-      <div className="min-h-screen flex items-start justify-center bg-[#f5f5f7] px-4 pt-28">
+      <div className="min-h-screen flex items-start justify-center bg-[#f5f5f7] px-4 pt-20">
         
         {/* 2. CARD: p-6 md:p-8 (Layout TETAP) */}
         <div className="w-full max-w-md bg-white p-6 md:p-8 rounded-2xl shadow-xl border border-slate-100">
