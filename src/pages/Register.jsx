@@ -195,11 +195,6 @@ export default function Register() {
               {isLoading ? "Verifying..." : "Confirm Code"}
             </button>
             
-            {/* ... Tombol Confirm Code ada di atas sini ... */}
-            <button onClick={handleVerifyOtp} disabled={isLoading} className="...">
-              {isLoading ? "Verifying..." : "Confirm Code"}
-            </button>
-            
             {/* resend code */}
             <div className="mt-6 text-center text-sm">
               {resendTimer > 0 ? (
