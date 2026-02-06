@@ -1,9 +1,8 @@
-// src/pages/Home.jsx
 import Footer from "../components/Footer";
-export default function Home() { 
+export default function Compare() { 
   return (
     <>
-      <div>Home Page</div>
+      <div>Compare Page</div>
       <Footer />
     </>
   );

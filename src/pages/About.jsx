@@ -1,9 +1,8 @@
-// src/pages/Home.jsx
 import Footer from "../components/Footer";
-export default function Home() { 
+export default function About() { 
   return (
     <>
-      <div>Home Page</div>
+      <div>About Page</div>
       <Footer />
     </>
   );

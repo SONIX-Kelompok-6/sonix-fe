@@ -23,7 +23,7 @@ export default function Navbar() {
           <div className="relative flex items-center">
             <img 
               src={logoImg}  
-              alt="RUSH Logo" 
+              alt="RUSH Logo "
               className="h-16 w-auto object-contain -my-4 transition-transform group-hover:scale-105" 
             />
           </div>

@@ -1,4 +1,6 @@
 import React from "react";
+import Footer from "../components/Footer";
+
 import roadImg from "../assets/recommendation/road.png";
 import trailImg from "../assets/recommendation/trail.png";
 
@@ -45,6 +47,7 @@ export default function Recommendation() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }
