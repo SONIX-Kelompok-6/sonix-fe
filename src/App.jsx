@@ -4,12 +4,14 @@ import { Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 
 // 2. Import Halaman-Halaman (yang isinya ganti-ganti)
-// Pastikan file-file ini sudah kamu buat di folder src/pages/ ya!
 import Home from "./pages/Home";
 import Recommendation from "./pages/Recommendation";
 import Login from "./pages/Login"; 
 import Register from "./pages/Register";
 import CreateProfile from "./pages/CreateProfile";
+import ForgotPassword from "./pages/ForgotPassword";
+import UpdatePassword from "./pages/UpdatePassword";
+
 
 export default function App() {
   return (
@@ -35,6 +37,10 @@ export default function App() {
 
         <Route path="/create-profile" element={<CreateProfile />} />
 
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        
+        <Route path="/update-password" element={<UpdatePassword />} />
+
         {/* Kalau link ngawur -> Tampilkan 404 */}
         <Route path="*" element={<div className="pt-32 text-center font-bold">404 - Page Not Found</div>} />
         
@@ -43,3 +49,7 @@ export default function App() {
     </div>
   );
 }
+
+// di bagian import
+
+// di dalam <Routes>
