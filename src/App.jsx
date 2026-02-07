@@ -8,6 +8,7 @@ import Home from "./pages/Home";
 import Recommendation from "./pages/Recommendation";
 import Login from "./pages/Login"; 
 import Register from "./pages/Register";
+import About from "./pages/About"; 
 import CreateProfile from "./pages/CreateProfile";
 import ForgotPassword from "./pages/ForgotPassword";
 import UpdatePassword from "./pages/UpdatePassword";
@@ -15,8 +16,9 @@ import UpdatePassword from "./pages/UpdatePassword";
 
 export default function App() {
   return (
-    <div className="font-sans text-gray-900 bg-white min-h-screen">
-      
+     <div className="font-sans text-slate-900 bg-gradient-to-b from-sky-100 to-blue-200 min-h-screen flex flex-col">
+
+
       {/* Navbar ditaruh di LUAR <Routes> */}
       {/* Artinya: Navbar bakal nempel terus walau halamannya ganti */}
       <Navbar />
@@ -40,6 +42,7 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         
         <Route path="/update-password" element={<UpdatePassword />} />
+        <Route path="/about" element={<About />} />
 
         {/* Kalau link ngawur -> Tampilkan 404 */}
         <Route path="*" element={<div className="pt-32 text-center font-bold">404 - Page Not Found</div>} />
