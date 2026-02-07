@@ -16,9 +16,8 @@ import UpdatePassword from "./pages/UpdatePassword";
 
 export default function App() {
   return (
-     <div className="font-sans text-slate-900 bg-gradient-to-b from-sky-100 to-blue-200 min-h-screen flex flex-col">
-
-
+    <div className="font-sans text-gray-900 bg-white min-h-screen">
+      
       {/* Navbar ditaruh di LUAR <Routes> */}
       {/* Artinya: Navbar bakal nempel terus walau halamannya ganti */}
       <Navbar />
