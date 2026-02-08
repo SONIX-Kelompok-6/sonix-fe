@@ -1,10 +1,40 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-// Import sudah benar (.svg)
+import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
 import logoImg from '../assets/logo-dark.svg'; 
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const navigate = useNavigate();
+
+  // 1. PERBAIKAN DI SINI: Ganti "token" jadi "userToken"
+  const isAuthenticated = !!localStorage.getItem("userToken");
+
+  const handleLogout = async () => {
+    // 2. Ambil token pake nama key yang benar
+    const token = localStorage.getItem("userToken");
+
+    try {
+      if (token) {
+        // Lapor backend (Header tetap pake format "Token <isi_token>")
+        await axios.post('http://localhost:8000/api/logout/', {}, {
+          headers: { 'Authorization': `Token ${token}` }
+        });
+      }
+    } catch (error) {
+      console.error("Logout backend error:", error);
+    } finally {
+      // 3. HAPUS KEY YANG BENAR ("userToken")
+      localStorage.removeItem("userToken");
+      
+      // Hapus data user lain jika ada
+      // localStorage.removeItem("userData"); 
+
+      // Refresh halaman biar navbar sadar diri
+      navigate("/login");
+      window.location.reload();
+    }
+  };
 
   const menuItems = [
     { name: "Home", path: "/" },
@@ -18,7 +48,7 @@ export default function Navbar() {
     <div className="fixed top-6 left-0 right-0 z-50 flex justify-center px-4">
       <nav className="relative flex w-full max-w-6xl items-center justify-between rounded-full bg-blue-50/90 px-6 py-3 shadow-lg backdrop-blur-md border border-white/40">
         
-        {/* 1. LOGO SECTION */}
+        {/* LOGO */}
         <Link to="/" className="flex items-center gap-3 group">
           <div className="relative flex items-center">
             <img 
@@ -29,13 +59,12 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* 2. DESKTOP MENU */}
+        {/* DESKTOP MENU */}
         <div className="hidden md:flex items-center gap-8">
           {menuItems.map((item) => (
             <Link
               key={item.name}
               to={item.path}
-              // PERBAIKAN: slate -> gray
               className="text-sm font-semibold text-gray-600 transition hover:text-blue-600 hover:underline hover:underline-offset-4"
             >
               {item.name}
@@ -43,12 +72,11 @@ export default function Navbar() {
           ))}
         </div>
 
-        {/* 3. RIGHT SECTION */}
+        {/* RIGHT SECTION */}
         <div className="flex items-center gap-4">
           
           {/* Search Bar */}
           <div className="relative hidden lg:block">
-            {/* PERBAIKAN: slate -> gray */}
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -57,21 +85,29 @@ export default function Navbar() {
             <input
               type="text"
               placeholder="Search..."
-              // PERBAIKAN: slate -> gray
               className="w-80 rounded-full bg-gray-200/50 py-2 pl-9 pr-4 text-sm font-medium text-gray-700 placeholder-gray-400 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
 
-          <Link 
-            to="/login"
-            className="hidden sm:flex items-center justify-center h-10 rounded-full bg-[#0a0a5c] px-8 text-sm font-bold text-white shadow-md transition hover:bg-blue-900 hover:shadow-lg active:scale-95"
-          >
-            Login
-          </Link>
+          {/* DYNAMIC BUTTON (LOGIC LOGOUT/LOGIN) */}
+          {isAuthenticated ? (
+            <button 
+              onClick={handleLogout}
+              className="hidden sm:flex items-center justify-center h-10 rounded-full bg-red-600 px-8 text-sm font-bold text-white shadow-md transition hover:bg-red-700 hover:shadow-lg active:scale-95"
+            >
+              Logout
+            </button>
+          ) : (
+            <Link 
+              to="/login"
+              className="hidden sm:flex items-center justify-center h-10 rounded-full bg-[#0a0a5c] px-8 text-sm font-bold text-white shadow-md transition hover:bg-blue-900 hover:shadow-lg active:scale-95"
+            >
+              Login
+            </Link>
+          )}
 
           {/* HAMBURGER BUTTON */}
           <button 
-            // PERBAIKAN: slate -> gray
             className="md:hidden p-2 text-gray-600 transition hover:text-blue-600"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
@@ -95,20 +131,32 @@ export default function Navbar() {
                   key={item.name}
                   to={item.path}
                   onClick={() => setIsMenuOpen(false)}
-                  // PERBAIKAN: slate -> gray
                   className="block rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-blue-50 hover:text-blue-600"
                 >
                   {item.name}
                 </Link>
               ))}
               <hr className="border-gray-200" />
-              <Link 
-                to="/login"
-                onClick={() => setIsMenuOpen(false)}
-                className="flex w-full items-center justify-center rounded-full bg-[#0a0a5c] py-2 text-sm font-bold text-white hover:bg-blue-900"
-              >
-                Login
-              </Link>
+              
+              {isAuthenticated ? (
+                <button 
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="flex w-full items-center justify-center rounded-full bg-red-600 py-2 text-sm font-bold text-white hover:bg-red-700"
+                >
+                  Logout
+                </button>
+              ) : (
+                <Link 
+                  to="/login"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="flex w-full items-center justify-center rounded-full bg-[#0a0a5c] py-2 text-sm font-bold text-white hover:bg-blue-900"
+                >
+                  Login
+                </Link>
+              )}
           </div>
         )}
 
