@@ -6,7 +6,7 @@ import trailImg from "../assets/recommendation-page/trail.png";
 export default function Recommendation() {
   return (
     <div className="bg-white rounded-3xl shadow-xl w-[90%] max-w-[400px] p-8 mx-auto my-25">
-      <h2 className="text-center font-bold tracking-[0.1em] mb-8 text-gray-800 text-xl">
+      <h2 className="text-center font-bold tracking-[0.1em] mb-5 text-gray-800 text-xl">
         TYPES OF RUNNING
       </h2>
 
