@@ -2,7 +2,7 @@ import { Routes, Route } from "react-router-dom";
 
 // 1. Import Komponen Tetap (yang muncul di semua halaman)
 import Navbar from "./components/Navbar";
-
+import Footer from "./components/Footer";
 // 2. Import Halaman-Halaman (yang isinya ganti-ganti)
 import Home from "./pages/Home";
 import Recommendation from "./pages/Recommendation";
@@ -47,7 +47,7 @@ export default function App() {
         <Route path="*" element={<div className="pt-32 text-center font-bold">404 - Page Not Found</div>} />
         
       </Routes>
-
+      <Footer />
     </div>
   );
 }
