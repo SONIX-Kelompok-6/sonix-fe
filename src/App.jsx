@@ -2,6 +2,7 @@ import { Routes, Route } from "react-router-dom";
 
 // 1. Import Komponen Tetap (yang muncul di semua halaman)
 import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
 
 // 2. Import Halaman-Halaman (yang isinya ganti-ganti)
 import Home from "./pages/Home";
@@ -14,48 +15,41 @@ import ForgotPassword from "./pages/ForgotPassword";
 import UpdatePassword from "./pages/UpdatePassword";
 import ShoeDetail from "./pages/ShoeDetail";
 
+// TAMBAHAN 1: Import halaman Search
+import Search from "./pages/Search"; 
 
 export default function App() {
   return (
-    <div className="font-sans text-gray-900 bg-white min-h-screen">
+    // PERUBAHAN 1: Tambah 'flex flex-col' di div paling luar
+    <div className="font-sans text-gray-900 bg-white min-h-screen flex flex-col">
       
       {/* Navbar ditaruh di LUAR <Routes> */}
-      {/* Artinya: Navbar bakal nempel terus walau halamannya ganti */}
       <Navbar />
 
-      {/* <Routes> adalah area yang isinya berubah sesuai alamat link */}
-      <Routes>
-        
-        {/* Kalau buka website.com/ -> Tampilkan halaman Home */}
-        <Route path="/" element={<Home />} />
-        
-        {/* Kalau buka website.com/login -> Tampilkan halaman Login */}
-        <Route path="/login" element={<Login />} />
-        
-        {/* Kalau buka website.com/recommendation -> Tampilkan halaman Recommendation */}
-        <Route path="/recommendation" element={<Recommendation />} />
+      {/* PERUBAHAN 2: Bungkus <Routes> pakai tag <main> dan kasih 'flex-grow pt-28' */}
+      <main className="flex-grow pt-28">
+        <Routes>
+          
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/recommendation" element={<Recommendation />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/create-profile" element={<CreateProfile />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/update-password" element={<UpdatePassword />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/search" element={<Search />} />
+          <Route path="/shoe/:slug" element={<ShoeDetail />} />
 
-        <Route path="/register" element={<Register />} />
+          {/* Kalau link ngawur -> Tampilkan 404 */}
+          <Route path="*" element={<div className="text-center font-bold">404 - Page Not Found</div>} />
+          
+        </Routes>
+      </main>
 
-        <Route path="/create-profile" element={<CreateProfile />} />
-
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        
-        <Route path="/update-password" element={<UpdatePassword />} />
-
-        <Route path="/about" element={<About />} />
-
-        <Route path="/shoe/:slug" element={<ShoeDetail />} />
-
-        {/* Kalau link ngawur -> Tampilkan 404 */}
-        <Route path="*" element={<div className="pt-32 text-center font-bold">404 - Page Not Found</div>} />
-        
-      </Routes>
-
+      {/* Footer sekarang bakal nurut di bawah */}
+      <Footer />
+      
     </div>
   );
 }
-
-// di bagian import
-
-// di dalam <Routes>
