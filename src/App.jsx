@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 // 1. Import Komponen Tetap (yang muncul di semua halaman)
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+
 // 2. Import Halaman-Halaman (yang isinya ganti-ganti)
 import Home from "./pages/Home";
 import Recommendation from "./pages/Recommendation";
@@ -12,6 +13,8 @@ import About from "./pages/About";
 import CreateProfile from "./pages/CreateProfile";
 import ForgotPassword from "./pages/ForgotPassword";
 import UpdatePassword from "./pages/UpdatePassword";
+// TAMBAHAN 1: Import halaman Search
+import Search from "./pages/Search"; 
 
 export default function App() {
   return (
@@ -33,6 +36,9 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/update-password" element={<UpdatePassword />} />
           <Route path="/about" element={<About />} />
+          
+          {/* TAMBAHAN 2: Daftarin rute /search */}
+          <Route path="/search" element={<Search />} />
 
           {/* Kalau link ngawur -> Tampilkan 404 */}
           <Route path="*" element={<div className="text-center font-bold">404 - Page Not Found</div>} />
