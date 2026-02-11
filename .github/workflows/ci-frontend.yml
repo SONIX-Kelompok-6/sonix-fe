@@ -1,0 +1,26 @@
+name: Frontend CI (React/Vite)
+
+# 1. Kapan robot GitHub ini jalan?
+on:
+  pull_request:
+    branches: [ "develop" ] # Jalan pas ada PR ke branch develop
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest # Pakai OS Linux dari GitHub
+
+    steps:
+    - name: Mengambil kode dari repository
+      uses: actions/checkout@v4
+
+    - name: Siapin Bun
+      uses: oven-sh/setup-bun@v1 # Ini action khusus buat nge-install Bun di server GitHub
+      with:
+        bun-version: latest # Ambil Bun versi paling baru
+
+    - name: Install Dependencies (bun install)
+      run: bun install
+
+    - name: Build Frontend (Vite)
+      # Ini senjata utamanya. Kalau kodingan lu ada error fatal, proses build ini bakal gagal (silang merah ❌)
+      run: bun run build
