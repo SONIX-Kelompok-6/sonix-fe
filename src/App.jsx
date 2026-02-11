@@ -13,6 +13,8 @@ import About from "./pages/About";
 import CreateProfile from "./pages/CreateProfile";
 import ForgotPassword from "./pages/ForgotPassword";
 import UpdatePassword from "./pages/UpdatePassword";
+import ShoeDetail from "./pages/ShoeDetail";
+
 // TAMBAHAN 1: Import halaman Search
 import Search from "./pages/Search"; 
 
@@ -36,9 +38,8 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/update-password" element={<UpdatePassword />} />
           <Route path="/about" element={<About />} />
-          
-          {/* TAMBAHAN 2: Daftarin rute /search */}
           <Route path="/search" element={<Search />} />
+          <Route path="/shoe/:slug" element={<ShoeDetail />} />
 
           {/* Kalau link ngawur -> Tampilkan 404 */}
           <Route path="*" element={<div className="text-center font-bold">404 - Page Not Found</div>} />
