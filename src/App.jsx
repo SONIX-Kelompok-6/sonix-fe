@@ -13,6 +13,7 @@ import About from "./pages/About";
 import CreateProfile from "./pages/CreateProfile";
 import ForgotPassword from "./pages/ForgotPassword";
 import UpdatePassword from "./pages/UpdatePassword";
+import Favorite from "./pages/Favorites";
 // TAMBAHAN 1: Import halaman Search
 import Search from "./pages/Search"; 
 
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/update-password" element={<UpdatePassword />} />
           <Route path="/about" element={<About />} />
+          <Route path="/favorites" element={<Favorite />} />
           
           {/* TAMBAHAN 2: Daftarin rute /search */}
           <Route path="/search" element={<Search />} />

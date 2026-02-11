@@ -3,30 +3,95 @@ import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 
 export default function Search() {
-  // 1. Tangkap kata kunci 'q' dari URL (misal: /search?q=nike)
   const [searchParams] = useSearchParams();
   const query = searchParams.get("q");
 
-  // 2. State untuk nyimpen data
   const [shoes, setShoes] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // --- TAMBAHAN BARU: Fungsi untuk tombol Favorite & Compare ---
-  const handleAddFavorite = (shoe) => {
-    console.log("Tambah ke Favorite:", shoe.name);
-    // Nanti logika API nyimpen ke database taruh sini
+  // --- TAMBAHAN BARU: State buat nyimpen ID sepatu yang udah di-favorit ---
+  const [favoriteIds, setFavoriteIds] = useState([]);
+
+  // --- TAMBAHAN BARU: Tarik data favorit pas komponen dibuka biar hatinya sesuai ---
+  useEffect(() => {
+    const fetchFavoriteIds = async () => {
+      const token = localStorage.getItem("userToken");
+      if (!token) return; // Kalau belum login, skip aja
+
+      try {
+        const response = await axios.get("http://localhost:8000/api/favorites/", {
+          headers: { Authorization: `Token ${token}` },
+        });
+        // Ambil array yang isinya cuma shoe_id doang
+        const ids = response.data.map((item) => item.shoe_id);
+        setFavoriteIds(ids);
+      } catch (err) {
+        console.error("Gagal mengambil data favorit awal:", err);
+      }
+    };
+
+    fetchFavoriteIds();
+  }, []); // Jalan sekali pas awal aja
+
+  // --- LOGIKA FAVORITE & COMPARE ---
+  const handleAddFavorite = async (shoe) => {
+    const token = localStorage.getItem("userToken");
+
+    if (!token) {
+      alert("Lu harus login dulu, Bro!");
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        "http://localhost:8000/api/favorites/toggle/",
+        { 
+          shoe_id: String(shoe.shoe_id) 
+        },
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+          },
+        }
+      );
+
+      // --- TAMBAHAN BARU: Update warna hati tanpa perlu refresh page ---
+      if (response.data.is_favorite) {
+        // Kalau nambah favorit, masukin ID-nya ke array
+        setFavoriteIds((prev) => [...prev, shoe.shoe_id]);
+      } else {
+        // Kalau batal favorit, hapus ID-nya dari array
+        setFavoriteIds((prev) => prev.filter((id) => id !== shoe.shoe_id));
+      }
+
+      console.log(response.data.message); // Biar terminal bersih, alert gua ganti console.log aja ya biar ga ganggu UI
+    } catch (error) {
+      console.error("Gagal update favorite:", error);
+      alert(error.response?.data?.error || "Gagal memproses favorit.");
+    }
   };
 
   const handleAddCompare = (shoe) => {
-    console.log("Tambah ke Compare:", shoe.name);
-    // Nanti logika nyimpen ke localStorage taruh sini
+    const existingCompare = JSON.parse(localStorage.getItem("compare_shoes") || "[]");
+    
+    if (existingCompare.find((item) => item.shoe_id === shoe.shoe_id)) {
+      alert("Sepatu ini udah masuk daftar banding!");
+      return;
+    }
+
+    if (existingCompare.length >= 4) {
+      alert("Maksimal bandingin 4 sepatu ya.");
+      return;
+    }
+
+    const newCompare = [...existingCompare, shoe];
+    localStorage.setItem("compare_shoes", JSON.stringify(newCompare));
+    alert(`${shoe.name} ditambah ke daftar banding!`);
   };
-  // -----------------------------------------------------------
 
   // 3. Fungsi buat nembak API Django tiap kali 'query' berubah
   useEffect(() => {
-    // Kalau URL-nya kosong (cuma /search doang), gak usah nembak API
     if (!query) return;
 
     const fetchSearchResults = async () => {
@@ -34,7 +99,6 @@ export default function Search() {
       setError(null);
       
       try {
-        // NEMBAK API DJANGO (Pastikan port backend lu bener 8000)
         const response = await axios.get(`http://localhost:8000/api/shoes/search/?q=${query}`);
         setShoes(response.data);
       } catch (err) {
@@ -55,62 +119,64 @@ export default function Search() {
           Search Results for <span className="text-blue-600">"{query}"</span>
         </h1>
         <p className="text-gray-500 text-sm mt-1">
-          Menampilkan hasil pencarian sepatu berdasarkan kata kunci.
+          Show all shoes matching your search.
         </p>
       </div>
 
-      {/* KONDISI 1: Lagi Loading */}
       {isLoading && (
         <div className="flex justify-center items-center py-20">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
         </div>
       )}
 
-      {/* KONDISI 2: Ada Error (Misal Django mati) */}
       {!isLoading && error && (
         <div className="bg-red-50 text-red-600 p-4 rounded-lg text-center font-medium">
           {error}
         </div>
       )}
 
-      {/* KONDISI 3: Data Kosong / Gak Ketemu */}
       {!isLoading && !error && shoes.length === 0 && query && (
         <div className="text-center py-20 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 mx-auto text-gray-400 mb-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
           </svg>
-          <h2 className="text-lg font-bold text-gray-700">Sepatu tidak ditemukan</h2>
-          <p className="text-gray-500">Coba gunakan kata kunci lain, ya.</p>
+          <h2 className="text-lg font-bold text-gray-700">No Shoes Found</h2>
+          <p className="text-gray-500">Try using different keywords.</p>
         </div>
       )}
 
-      {/* KONDISI 4: Data Ketemu (Tampilin Grid Sepatu) - UDAH DI-UPDATE UI-NYA */}
       {!isLoading && !error && shoes.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {shoes.map((shoe) => (
             <div 
-              key={shoe.id} 
+              key={shoe.shoe_id} 
               className="group relative bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col cursor-pointer"
             >
               
-              {/* TOMBOL MELAYANG (FAVORITE & COMPARE) */}
+              {/* TOMBOL MELAYANG */}
               <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 translate-x-2 group-hover:translate-x-0">
-                
-                {/* Tombol Favorite */}
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
                     handleAddFavorite(shoe);
                   }}
-                  className="p-2.5 bg-white/90 backdrop-blur-sm rounded-full shadow-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
-                  title="Add to Favorite"
+                  className="p-2.5 bg-white/90 backdrop-blur-sm rounded-full shadow-md text-gray-400 hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Toggle Favorite"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
-                  </svg>
+                  {/* --- TAMBAHAN BARU: Logic ganti warna icon hati --- */}
+                  {favoriteIds.includes(shoe.shoe_id) ? (
+                    // Hati Terisi (Merah Solid)
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-red-500">
+                      <path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" />
+                    </svg>
+                  ) : (
+                    // Hati Kosong (Outline biasa)
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 hover:text-red-500">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+                    </svg>
+                  )}
                 </button>
                 
-                {/* Tombol Compare */}
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
@@ -125,7 +191,7 @@ export default function Search() {
                 </button>
               </div>
 
-              {/* Gambar Sepatu */}
+              {/* Gambar */}
               <div className="h-56 bg-gray-50 p-6 flex justify-center items-center relative overflow-hidden">
                 <img 
                   src={shoe.image_url || "https://via.placeholder.com/300x200?text=No+Image"} 
@@ -134,7 +200,7 @@ export default function Search() {
                 />
               </div>
               
-              {/* Info Sepatu */}
+              {/* Info */}
               <div className="p-5 flex flex-col flex-grow bg-white">
                 <p className="text-xs text-blue-600 font-bold uppercase tracking-widest mb-1">{shoe.brand || "Brand"}</p>
                 <h3 className="font-bold text-gray-800 text-base mb-3 line-clamp-2 leading-snug">{shoe.name}</h3>
