@@ -12,6 +12,7 @@ import About from "./pages/About";
 import CreateProfile from "./pages/CreateProfile";
 import ForgotPassword from "./pages/ForgotPassword";
 import UpdatePassword from "./pages/UpdatePassword";
+import ShoeDetail from "./pages/ShoeDetail";
 
 
 export default function App() {
@@ -41,7 +42,10 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         
         <Route path="/update-password" element={<UpdatePassword />} />
+
         <Route path="/about" element={<About />} />
+
+        <Route path="/shoe/:slug" element={<ShoeDetail />} />
 
         {/* Kalau link ngawur -> Tampilkan 404 */}
         <Route path="*" element={<div className="pt-32 text-center font-bold">404 - Page Not Found</div>} />
