@@ -42,7 +42,7 @@ export default function Navbar() {
     { name: "Home", path: "/" },
     { name: "Recommendation", path: "/recommendation" },
     { name: "Compare", path: "/compare" },
-    { name: "Favorite", path: "/favorite" },
+    { name: "Favorites", path: "/favorites" },
     { name: "About", path: "/about" },
   ];
 

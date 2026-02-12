@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom"; // Pastikan Link diimport
 import axios from "axios";
 
 export default function Search() {
@@ -10,6 +10,7 @@ export default function Search() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // LOGIC LENGKAP DARI DEVELOP
   const handleAddFavorite = async (shoe) => {
     const token = localStorage.getItem("userToken");
 
@@ -18,6 +19,7 @@ export default function Search() {
       return;
     }
 
+    // 1. Optimistic Update (Ubah UI duluan biar cepet)
     setShoes((prevShoes) =>
       prevShoes.map((s) =>
         s.shoe_id === shoe.shoe_id ? { ...s, isFavorite: !s.isFavorite } : s
@@ -25,9 +27,10 @@ export default function Search() {
     );
 
     try {
+      // 2. Tembak API
       await axios.post(
         "http://localhost:8000/api/favorites/toggle/",
-        { shoe_id: shoe.shoe_id }, 
+        { shoe_id: String(shoe.shoe_id) }, // Pastikan ID jadi String
         {
           headers: {
             Authorization: `Token ${token}`,
@@ -36,6 +39,7 @@ export default function Search() {
       );
     } catch (err) {
       console.error("Failed to toggle favorite:", err);
+      // Kalau gagal, balikin lagi statusnya (Rollback)
       setShoes((prevShoes) =>
         prevShoes.map((s) =>
           s.shoe_id === shoe.shoe_id ? { ...s, isFavorite: !s.isFavorite } : s
@@ -47,6 +51,7 @@ export default function Search() {
 
   const handleAddCompare = (shoe) => {
     console.log("Add to Compare:", shoe.name);
+    // Logic compare nanti lu tambahin di sini
   };
 
   useEffect(() => {
@@ -57,17 +62,18 @@ export default function Search() {
       setError(null);
       
       try {
-        // --- UPDATE: Ambil token untuk sinkronisasi status Favorite ---
+        // AMBIL TOKEN DULU
         const token = localStorage.getItem("userToken");
 
         const response = await axios.get(
           `http://localhost:8000/api/shoes/search/?q=${query}`,
           {
-            // Kirim token di header agar Django bisa cek status Like user
+            // PENTING: Kirim token biar Backend tau mana yang udah dilike
             headers: token ? { Authorization: `Token ${token}` } : {},
           }
         );
         
+        // Mapping data biar aman
         const dataWithFavorites = response.data.map(shoe => ({
           ...shoe,
           isFavorite: shoe.isFavorite || false
@@ -122,7 +128,7 @@ export default function Search() {
           {shoes.map((shoe) => (
             <Link 
               to={`/shoe/${shoe.slug}`} 
-              key={shoe.shoe_id} 
+              key={shoe.shoe_id} // Pastikan pake shoe_id
               className="group relative bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col cursor-pointer"
             >
               <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 translate-x-2 group-hover:translate-x-0">
@@ -158,8 +164,9 @@ export default function Search() {
               </div>
 
               <div className="h-56 bg-gray-50 p-6 flex justify-center items-center relative overflow-hidden">
+                {/* PASTIKAN INI PAKE image_url (atau img_url sesuai database lu) */}
                 <img 
-                  src={shoe.img_url || "https://via.placeholder.com/300x200?text=No+Image"} 
+                  src={shoe.image_url || shoe.img_url || "https://via.placeholder.com/300x200?text=No+Image"} 
                   alt={shoe.name} 
                   className="max-h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-500"
                 />
