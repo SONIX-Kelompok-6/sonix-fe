@@ -130,7 +130,7 @@ export default function Search() {
                 <p className="text-xs text-blue-600 font-bold uppercase tracking-widest mb-1">{shoe.brand || "Brand"}</p>
                 <h3 className="font-bold text-gray-800 text-base mb-3 line-clamp-2 leading-snug">{shoe.name}</h3>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}
