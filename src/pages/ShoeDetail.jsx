@@ -10,9 +10,23 @@ export default function ShoeDetail() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [newReview, setNewReview] = useState({ rating: 0, text: "" });
-  
+
+  // --- START UPDATE: LOGIC GUEST NAME ---
+  // 1. Cek Token & Email
+  const token = localStorage.getItem("userToken");
   const currentUserEmail = localStorage.getItem("userEmail");
-  const currentUserName = currentUserEmail ? currentUserEmail.split('@')[0] : "Guest";
+
+  // 2. State untuk menyimpan nama random (dibuat sekali saat komponen mount)
+  const [randomGuestName] = useState(() => {
+    const randomId = Math.floor(Math.random() * 10000); 
+    return `Runner_${randomId}`; 
+  });
+
+  // 3. Tentukan nama yang dipakai: Kalau login pakai email, kalau tidak pakai randomGuestName
+  const currentUserName = (token && currentUserEmail) 
+    ? currentUserEmail.split('@')[0] 
+    : randomGuestName;
+  // --- END UPDATE ---
 
   useEffect(() => {
     const fetchShoeDetail = async () => {
@@ -81,7 +95,7 @@ export default function ShoeDetail() {
 
       const addedReview = {
         id: Date.now(),
-        user: currentUserName,
+        user: currentUserName, // Akan menggunakan currentUserName yang sudah logic baru
         avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=" + currentUserName,
         date: new Date().toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' }),
         text: newReview.text,
@@ -189,6 +203,7 @@ export default function ShoeDetail() {
         <div className="mt-12">
           <div className="bg-orange-400 rounded-t-2xl p-4 flex items-center justify-between">
             <div className="flex items-center space-x-4">
+              {/* Ini akan menampilkan Nama User Asli jika login, atau "Guest_XXXX" jika tidak */}
               <span className="font-bold text-gray-800">{currentUserName}</span>
               <div className="flex text-2xl text-white">
                 {[1, 2, 3, 4, 5].map((star) => (
