@@ -48,18 +48,14 @@ jobs:
           # Ambil token dari Secrets
           API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
         run: |
-          # 1. Konfigurasi Email & User (Biar Git gak nanya)
           git config --global user.email "wilsonphan002@gmail.com"
           git config --global user.name "wilsonPhan02"
           
-          # 2. Tambahin Remote URL Manual (INI KUNCINYA!)
-          # Kita tulis URL lengkap pake format: https://USER:TOKEN@github.com/USER/REPO.git
-          # Jadi gak mungkin salah alamat lagi.
-          git remote add target https://wilsonPhan02:$API_TOKEN_GITHUB@github.com/wilsonPhan02/sonix-fe-deploy.git
+          # --- PERUBAHAN PENTING DI SINI ---
+          # Kita pake username "oauth2" biar GitHub tau ini login pake token
+          # Dan pastikan nama repo SESUAI HASIL CEK DI ATAS (sonix-fe atau sonix-fe-deploy?)
           
-          # 3. Pindah ke branch main (jaga-jaga)
-          git checkout main
+          git remote add target https://oauth2:$API_TOKEN_GITHUB@github.com/wilsonPhan02/sonix-fe-deploy.git
           
-          # 4. Force Push (Timpa repo tujuan dengan yang ini)
-          # Pake -f (force) biar dia gak peduli history beda, pokoknya samain!
+          git checkout main || git checkout -b main
           git push -f target main
