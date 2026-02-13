@@ -27,9 +27,9 @@ const CreateProfile = () => {
   });
 
   // 1. Handle Input Biasa (Weight)
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  // const handleChange = (e) => {
+  //   setFormData({ ...formData, [e.target.name]: e.target.value });
+  // };
 
   // 2. Handle Pilihan Kartu Gambar (Foot & Arch)
   const handleSelect = (field, value) => {
@@ -42,16 +42,16 @@ const CreateProfile = () => {
   };
 
   // 4. Handle Injury Checkbox (Multi-Select Logic) 🧠
-  const handleInjuryToggle = (injuryLabel) => {
-    setFormData((prev) => {
-      const current = prev.injury_history;
-      if (current.includes(injuryLabel)) {
-        return { ...prev, injury_history: current.filter(item => item !== injuryLabel) }; // Remove
-      } else {
-        return { ...prev, injury_history: [...current, injuryLabel] }; // Add
-      }
-    });
-  };
+  // const handleInjuryToggle = (injuryLabel) => {
+  //   setFormData((prev) => {
+  //     const current = prev.injury_history;
+  //     if (current.includes(injuryLabel)) {
+  //       return { ...prev, injury_history: current.filter(item => item !== injuryLabel) }; // Remove
+  //     } else {
+  //       return { ...prev, injury_history: [...current, injuryLabel] }; // Add
+  //     }
+  //   });
+  // };
 
   // 5. Submit ke Backend
   const handleSubmit = async (e) => {
@@ -64,7 +64,7 @@ const CreateProfile = () => {
       // Pastikan weight dikirim sebagai Angka (Integer)
       const payload = {
         ...formData,
-        weight_kg: parseInt(formData.weight_kg)
+        // weight_kg: parseInt(formData.weight_kg)
       };
 
       await axios.post('http://127.0.0.1:8000/api/profile/', payload, {
@@ -110,7 +110,7 @@ const CreateProfile = () => {
         <form onSubmit={handleSubmit} className="space-y-8">
           
           {/* 1. WEIGHT (Tidak perlu Tooltip) */}
-          <div>
+          {/* <div>
             <label className="block text-gray-700 font-bold mb-2">Weight (kg)</label>
             <input
               type="number"
@@ -122,7 +122,7 @@ const CreateProfile = () => {
               placeholder="e.g. 70"
               required
             />
-          </div>
+          </div> */}
 
           {/* 2. FOOT WIDTH (Image Cards) + TOOLTIP */}
           <div>
@@ -225,7 +225,7 @@ const CreateProfile = () => {
           </div>
 
           {/* 5. INJURY HISTORY (Multi Checkbox) + TOOLTIP */}
-          <div>
+          {/* <div>
             <label className="flex items-center text-gray-700 font-bold mb-2">
               Past Injuries (Select all that apply)
               <InfoTooltip 
@@ -250,7 +250,7 @@ const CreateProfile = () => {
                 </div>
               ))}
             </div>
-          </div>
+          </div> */}
 
           {/* SUBMIT BUTTON */}
           <button
