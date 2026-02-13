@@ -7,16 +7,24 @@ export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
 
-  // 1. PERBAIKAN DI SINI: Ganti "token" jadi "userToken"
+  // 1. TAMBAHAN SEARCH: State untuk nyimpen ketikan user
+  const [searchQuery, setSearchQuery] = useState("");
+
   const isAuthenticated = !!localStorage.getItem("userToken");
 
+  // 2. TAMBAHAN SEARCH: Fungsi buat nangkep tombol Enter
+  const handleSearch = (e) => {
+    if (e.key === 'Enter' && searchQuery.trim() !== "") {
+      navigate(`/search?q=${searchQuery}`);
+      setSearchQuery(""); // (Opsional) Kosongin bar pencarian setelah di-enter
+    }
+  };
+
   const handleLogout = async () => {
-    // 2. Ambil token pake nama key yang benar
     const token = localStorage.getItem("userToken");
 
     try {
       if (token) {
-        // Lapor backend (Header tetap pake format "Token <isi_token>")
         await axios.post('http://localhost:8000/api/logout/', {}, {
           headers: { 'Authorization': `Token ${token}` }
         });
@@ -24,13 +32,7 @@ export default function Navbar() {
     } catch (error) {
       console.error("Logout backend error:", error);
     } finally {
-      // 3. HAPUS KEY YANG BENAR ("userToken")
       localStorage.removeItem("userToken");
-      
-      // Hapus data user lain jika ada
-      // localStorage.removeItem("userData"); 
-
-      // Refresh halaman biar navbar sadar diri
       navigate("/login");
       window.location.reload();
     }
@@ -40,7 +42,7 @@ export default function Navbar() {
     { name: "Home", path: "/" },
     { name: "Recommendation", path: "/recommendation" },
     { name: "Compare", path: "/compare" },
-    { name: "Favorite", path: "/favorite" },
+    { name: "Favorites", path: "/favorites" },
     { name: "About", path: "/about" },
   ];
 
@@ -85,6 +87,10 @@ export default function Navbar() {
             <input
               type="text"
               placeholder="Search..."
+              // 3. TAMBAHAN SEARCH: Sambungin input ke state dan fungsi handleSearch
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleSearch}
               className="w-80 rounded-full bg-gray-200/50 py-2 pl-9 pr-4 text-sm font-medium text-gray-700 placeholder-gray-400 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
