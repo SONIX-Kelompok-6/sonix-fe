@@ -86,7 +86,7 @@ export default function Navbar() {
             </span>
             <input
               type="text"
-              placeholder="Search..."
+              placeholder="test prod"
               // 3. TAMBAHAN SEARCH: Sambungin input ke state dan fungsi handleSearch
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
