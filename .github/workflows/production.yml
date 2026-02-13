@@ -41,21 +41,28 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Ambil semua history biar bisa di-push
+          fetch-depth: 0
 
       - name: Force Sync to Personal Repo
         env:
-          # Ambil token dari Secrets
           API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
         run: |
+          # 1. DEBUG: Cek apakah token kebaca? (Tenang, isinya bakal dibintangin ***)
+          if [ -z "$API_TOKEN_GITHUB" ]; then
+            echo "❌ ERROR FATAL: API_TOKEN_GITHUB Kosong! Cek Secrets di Repo Organisasi!"
+            exit 1
+          else
+            echo "✅ Token Terdeteksi (Panjang karakter: ${#API_TOKEN_GITHUB})"
+          fi
+
+          # 2. Config User
           git config --global user.email "wilsonphan002@gmail.com"
           git config --global user.name "wilsonPhan02"
           
-          # --- PERUBAHAN PENTING DI SINI ---
-          # Kita pake username "oauth2" biar GitHub tau ini login pake token
-          # Dan pastikan nama repo SESUAI HASIL CEK DI ATAS (sonix-fe atau sonix-fe-deploy?)
+          # 3. Masukin URL Remote (Pake format username:token)
+          # Pastikan link ini bisa dibuka di browser lu!
+          REPO_URL="https://wilsonPhan02:$API_TOKEN_GITHUB@github.com/wilsonPhan02/sonix-fe-deploy.git"
           
-          git remote add target https://oauth2:$API_TOKEN_GITHUB@github.com/wilsonPhan02/sonix-fe-deploy.git
-          
-          git checkout main || git checkout -b main
+          # 4. Tambah Remote & Push
+          git remote add target $REPO_URL
           git push -f target main
