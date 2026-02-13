@@ -54,6 +54,7 @@ jobs:
           # Username GitHub Pribadi lu
           user-name: wilsonPhan02
           # Nama Repo Pribadi (Tempat Vercel nyolok)
+          destination-github-username: 'wilsonPhan02'
           destination-repository-name: 'sonix-fe-deploy'
           # Branch tujuan (biasanya main)
           target-branch: main
