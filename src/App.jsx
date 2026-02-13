@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 
 // 1. Import Komponen Tetap (yang muncul di semua halaman)
 import Navbar from "./components/Navbar";
@@ -19,6 +19,8 @@ import ShoeDetail from "./pages/ShoeDetail";
 import Search from "./pages/Search"; 
 
 export default function App() {
+  const location = useLocation();
+  const isCustomLayoutPage = location.pathname === "/";
   return (
     // PERUBAHAN 1: Tambah 'flex flex-col' di div paling luar
     <div className="font-sans text-gray-900 bg-white min-h-screen flex flex-col">
@@ -27,7 +29,7 @@ export default function App() {
       <Navbar />
 
       {/* PERUBAHAN 2: Bungkus <Routes> pakai tag <main> dan kasih 'flex-grow pt-28' */}
-      <main className="flex-grow pt-28">
+      <main className={`flex-grow ${isCustomLayoutPage ? "pt-22" : "pt-28"}`}>
         <Routes>
           
           <Route path="/" element={<Home />} />
