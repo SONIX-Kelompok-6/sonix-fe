@@ -35,26 +35,31 @@ jobs:
   # --- TAHAP 2: CD (Sync to Personal Repo) ---
   # Tahap ini cuma jalan kalau Tahap 1 SUKSES (Hijau)
   sync-deploy:
-    needs: check-quality  # <--- Ini kuncinya! Nunggu CI selesai dulu.
+    needs: check-quality
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout Source Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Wajib 0 biar history git kebawa semua
+          fetch-depth: 0 # Ambil semua history biar bisa di-push
 
-      - name: Push to Personal Repository (Trigger Vercel)
-        uses: cpina/github-action-push-to-another-repository@main
+      - name: Force Sync to Personal Repo
         env:
-          # Token Rahasia yang udah lu simpen di Settings Repo Organisasi
+          # Ambil token dari Secrets
           API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
-        with:
-          # Email akun GitHub pribadi lu
-          user-email: wilsonphan002@gmail.com
-          # Username GitHub Pribadi lu
-          user-name: wilsonPhan02
-          # Nama Repo Pribadi (Tempat Vercel nyolok)
-          destination-github-username: 'wilsonPhan02'
-          destination-repository-name: 'sonix-fe-deploy'
-          # Branch tujuan (biasanya main)
-          target-branch: main
+        run: |
+          # 1. Konfigurasi Email & User (Biar Git gak nanya)
+          git config --global user.email "wilsonphan002@gmail.com"
+          git config --global user.name "wilsonPhan02"
+          
+          # 2. Tambahin Remote URL Manual (INI KUNCINYA!)
+          # Kita tulis URL lengkap pake format: https://USER:TOKEN@github.com/USER/REPO.git
+          # Jadi gak mungkin salah alamat lagi.
+          git remote add target https://wilsonPhan02:$API_TOKEN_GITHUB@github.com/wilsonPhan02/sonix-fe-deploy.git
+          
+          # 3. Pindah ke branch main (jaga-jaga)
+          git checkout main
+          
+          # 4. Force Push (Timpa repo tujuan dengan yang ini)
+          # Pake -f (force) biar dia gak peduli history beda, pokoknya samain!
+          git push -f target main
