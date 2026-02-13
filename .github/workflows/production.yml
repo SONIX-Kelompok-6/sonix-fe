@@ -1,0 +1,59 @@
+name: Production CI/CD (Sync to Vercel)
+
+# Script ini jalan otomatis setiap ada update di branch main
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  # --- TAHAP 1: CI (Quality Control) ---
+  # Kita tes dulu. Kalau build gagal di sini, JANGAN dikirim ke repo pribadi.
+  # Biar website live lu gak ikutan rusak.
+  check-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install Dependencies
+        run: bun install
+
+      # (Opsional) Uncomment kalau lu punya linter
+      # - name: Lint Check
+      #   run: bun run lint
+
+      # Tes Build: Kalau ini error, proses STOP. Gak bakal lanjut ke deploy.
+      - name: Verify Build
+        run: bun run build
+
+  # --- TAHAP 2: CD (Sync to Personal Repo) ---
+  # Tahap ini cuma jalan kalau Tahap 1 SUKSES (Hijau)
+  sync-deploy:
+    needs: check-quality  # <--- Ini kuncinya! Nunggu CI selesai dulu.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Wajib 0 biar history git kebawa semua
+
+      - name: Push to Personal Repository (Trigger Vercel)
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          # Token Rahasia yang udah lu simpen di Settings Repo Organisasi
+          API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+        with:
+          # Email akun GitHub pribadi lu
+          user-email: wilsonphan002@gmail.com
+          # Username GitHub Pribadi lu
+          user-name: wilsonPhan02
+          # Nama Repo Pribadi (Tempat Vercel nyolok)
+          destination-repository-name: 'sonix-fe-deploy'
+          # Branch tujuan (biasanya main)
+          target-branch: main
