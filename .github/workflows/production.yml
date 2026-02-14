@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  # TAHAP 1: Cek Kualitas Kode
+  # TAHAP 1: Cek Kualitas (Build Test)
   check-quality:
     runs-on: ubuntu-latest
     steps:
@@ -24,7 +24,7 @@ jobs:
       - name: Build Project
         run: bun run build
 
-  # TAHAP 2: Kirim ke Repo Pribadi (Manual Git Mode)
+  # TAHAP 2: Sync Pake Plugin cpina (Lebih Rapi)
   sync-deploy:
     needs: check-quality
     runs-on: ubuntu-latest
@@ -33,16 +33,25 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false # <--- INI OBATNYA! Biar token default gak ikut campur.
+          # INI KUNCINYA! Kita matiin token bawaan biar cpina bisa pake token sakti lu
+          persist-credentials: false 
 
-      - name: Force Sync to Personal Repo
+      - name: Push to Personal Repository (Vercel Trigger)
+        uses: cpina/github-action-push-to-another-repository@main
         env:
+          # Token Sakti lu masuk sini
           API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
-        run: |
-          git config --global user.email "wilsonphan002@gmail.com"
-          git config --global user.name "wilsonPhan02"
+        with:
+          # Email & Username buat history commit
+          user-email: wilsonphan002@gmail.com
+          user-name: wilsonPhan02
           
-          # Kita pake format URL yang paling standar aja
-          git remote add target https://wilsonPhan02:${API_TOKEN_GITHUB}@github.com/wilsonPhan02/sonix-fe-deploy.git
+          # Tujuan: Akun Pribadi
+          destination-github-username: 'wilsonPhan02'
+          destination-repository-name: 'sonix-fe-deploy'
           
-          git push -f target main
+          # Branch Tujuan
+          target-branch: main
+          
+          # (Opsional) Biar history git lebih rapi, copy folder root '.'
+          source-directory: '.'
