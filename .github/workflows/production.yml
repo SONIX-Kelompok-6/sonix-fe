@@ -32,20 +32,17 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Ambil semua history
+          fetch-depth: 0
+          persist-credentials: false # <--- INI OBATNYA! Biar token default gak ikut campur.
 
       - name: Force Sync to Personal Repo
         env:
           API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
         run: |
-          # 1. Identitas Pura-pura (Biar Git gak nanya)
           git config --global user.email "wilsonphan002@gmail.com"
           git config --global user.name "wilsonPhan02"
           
-          # 2. Tambah Remote URL dengan Token (Metode x-access-token)
-          # Ini format paling sakti buat login pake token di command line
-          git remote add target https://x-access-token:${API_TOKEN_GITHUB}@github.com/wilsonPhan02/sonix-fe-deploy.git
+          # Kita pake format URL yang paling standar aja
+          git remote add target https://wilsonPhan02:${API_TOKEN_GITHUB}@github.com/wilsonPhan02/sonix-fe-deploy.git
           
-          # 3. Timpa Repo Tujuan
-          # Kita pake --force (-f) biar isi repo pribadi sama persis kayak repo organisasi
           git push -f target main
