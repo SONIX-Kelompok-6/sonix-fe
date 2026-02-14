@@ -29,7 +29,7 @@ export default function App() {
       <Navbar />
 
       {/* PERUBAHAN 2: Bungkus <Routes> pakai tag <main> dan kasih 'flex-grow pt-28' */}
-      <main className={`flex-grow ${isCustomLayoutPage ? "pt-22" : "pt-28"}`}>
+      <main className={`flex-grow ${isCustomLayoutPage ? "pt-0" : "pt-5"}`}>
         <Routes>
           
           <Route path="/" element={<Home />} />

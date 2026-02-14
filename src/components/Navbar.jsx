@@ -48,7 +48,7 @@ export default function Navbar() {
 
   return (
     <div className="fixed top-6 left-0 right-0 z-50 flex justify-center px-4">
-      <nav className="relative flex w-full max-w-6xl items-center justify-between rounded-full bg-blue-50/90 px-6 py-3 shadow-lg backdrop-blur-md border border-white/40">
+      <nav className="absolute top-0 w-full max-w-6xl z-50 flex items-center justify-between rounded-full bg-blue-50/90 px-6 py-3 shadow-lg backdrop-blur-md border border-white/40">
         
         {/* LOGO */}
         <Link to="/" className="flex items-center gap-3 group">
