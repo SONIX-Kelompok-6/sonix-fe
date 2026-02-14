@@ -1,15 +1,12 @@
-name: Production CI/CD (Sync to Vercel)
+name: Production Sync & Deploy
 
-# Script ini jalan otomatis setiap ada update di branch main
 on:
   push:
     branches:
       - main
 
 jobs:
-  # --- TAHAP 1: CI (Quality Control) ---
-  # Kita tes dulu. Kalau build gagal di sini, JANGAN dikirim ke repo pribadi.
-  # Biar website live lu gak ikutan rusak.
+  # TAHAP 1: Cek Kualitas Kode
   check-quality:
     runs-on: ubuntu-latest
     steps:
@@ -24,16 +21,10 @@ jobs:
       - name: Install Dependencies
         run: bun install
 
-      # (Opsional) Uncomment kalau lu punya linter
-      # - name: Lint Check
-      #   run: bun run lint
-
-      # Tes Build: Kalau ini error, proses STOP. Gak bakal lanjut ke deploy.
-      - name: Verify Build
+      - name: Build Project
         run: bun run build
 
-  # --- TAHAP 2: CD (Sync to Personal Repo) ---
-  # Tahap ini cuma jalan kalau Tahap 1 SUKSES (Hijau)
+  # TAHAP 2: Kirim ke Repo Pribadi (Manual Git Mode)
   sync-deploy:
     needs: check-quality
     runs-on: ubuntu-latest
@@ -41,21 +32,20 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Ambil semua history
 
       - name: Force Sync to Personal Repo
         env:
           API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
         run: |
-          # 1. Config User Dummy
+          # 1. Identitas Pura-pura (Biar Git gak nanya)
           git config --global user.email "wilsonphan002@gmail.com"
           git config --global user.name "wilsonPhan02"
           
-          # 2. INI PERUBAHANNYA!
-          # Kita pakai user "x-access-token". Ini username default buat auth pake token.
-          # Pastikan link belakangnya bener: github.com/wilsonPhan02/sonix-fe-deploy.git
-          
+          # 2. Tambah Remote URL dengan Token (Metode x-access-token)
+          # Ini format paling sakti buat login pake token di command line
           git remote add target https://x-access-token:${API_TOKEN_GITHUB}@github.com/wilsonPhan02/sonix-fe-deploy.git
           
-          # 3. Push
+          # 3. Timpa Repo Tujuan
+          # Kita pake --force (-f) biar isi repo pribadi sama persis kayak repo organisasi
           git push -f target main
