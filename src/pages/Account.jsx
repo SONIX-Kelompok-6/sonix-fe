@@ -7,12 +7,12 @@ export default function Account() {
   const [loading, setLoading] = useState(true);
   
   const [userData, setUserData] = useState({
-    username: "",
-    email: "",
-    joinDate: "",
+    username: "-",
+    email: "-",
+    joinDate: "-",
     profile: {
-      archType: "",
-      footWidth: "",
+      archType: "-",
+      footWidth: "-",
       orthotic: false 
     }
   });
@@ -112,11 +112,12 @@ export default function Account() {
           {/* HEADER GRADIENT */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-8 text-white flex flex-col md:flex-row items-center gap-6">
             <div className="w-24 h-24 rounded-full bg-white p-1 shadow-lg">
-              <img 
-                src="https://i.pravatar.cc/150?img=11" 
-                alt="Profile" 
-                className="w-full h-full rounded-full object-cover"
-              />
+                <div
+                    className="w-full h-full rounded-full bg-blue-500 flex items-center justify-center text-xl font-semibold text-white"
+                    aria-label="Profile avatar"
+                >   
+                    {(userData.username || "?").charAt(0).toUpperCase()}
+                </div>
             </div>
             
             <div className="text-center md:text-left">
