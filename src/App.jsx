@@ -16,7 +16,8 @@ import UpdatePassword from "./pages/UpdatePassword";
 import Favorites from "./pages/Favorites";
 import ShoeDetail from "./pages/ShoeDetail";
 import Search from "./pages/Search"; 
-import Compare from "./pages/Compare"
+import Compare from "./pages/Compare";
+import Account from "./pages/Account";
 
 export default function App() {
   const location = useLocation();
@@ -42,7 +43,7 @@ export default function App() {
           <Route path="/shoe/:slug" element={<ShoeDetail />} />
           <Route path="/search" element={<Search />} />
           <Route path="/compare" element={<Compare />} />
-
+          <Route path="/account" element={<Account />} />
           {/* Kalau link ngawur -> Tampilkan 404 */}
           <Route path="*" element={<div className="text-center font-bold">404 - Page Not Found</div>} />
           
