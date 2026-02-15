@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-// ✅ GANTI IMPORT: Pakai api instance buatanmu biar connect ke Railway
-import api from "../api/axios"; 
+import axios from "axios";
 import TermsModal from "../components/TermsModal";
 
 export default function Register() {
@@ -54,8 +53,8 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      // ✅ UPDATE: Pakai api.post & Path Relatif (Railway otomatis terdeteksi)
-      await api.post("/api/register/", {
+      // Tembak Django endpoint REGISTER
+      await axios.post("http://127.0.0.1:8000/api/register/", {
         email: formData.email,
         password: formData.password
       });
@@ -66,11 +65,10 @@ export default function Register() {
       alert("Kode OTP telah dikirim ke email kamu!");
 
     } catch (err) {
-      console.error("Register Error:", err);
       const data = err.response?.data;
       if (data?.email) setError(data.email[0]);
       else if (data?.error) setError(data.error);
-      else setError("Registration failed. Backend unreachable?");
+      else setError("Registration failed.");
     } finally {
       setIsLoading(false);
     }
@@ -80,13 +78,11 @@ export default function Register() {
   const handleResendCode = async () => {
     setResendTimer(60); // Reset waktu jadi 60 detik lagi
     try {
-      // ✅ UPDATE: Pakai api.post
-      await api.post("/api/resend-otp/", {
+      await axios.post("http://127.0.0.1:8000/api/resend-otp/", {
         email: formData.email
       });
       alert("Kode OTP baru telah dikirim!");
     } catch (err) {
-      console.error("Resend Error:", err);
       alert("Gagal mengirim ulang kode. Coba lagi nanti.");
     }
   };
@@ -99,8 +95,8 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      // ✅ UPDATE: Pakai api.post
-      await api.post("/api/verify-otp/", {
+      // Tembak Django endpoint VERIFY
+      await axios.post("http://127.0.0.1:8000/api/verify-otp/", {
         email: formData.email,
         otp: otpCode,
         password: formData.password // Kirim pass lagi untuk disimpan ke DB
@@ -110,7 +106,6 @@ export default function Register() {
       navigate("/login");
 
     } catch (err) {
-      console.error("Verify Error:", err);
       setError(err.response?.data?.error || "Invalid OTP Code.");
     } finally {
       setIsLoading(false);
@@ -152,7 +147,7 @@ export default function Register() {
                 <input type="password" id="confirmPassword" value={formData.confirmPassword} onChange={handleChange} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 bg-slate-50" required />
               </div>
 
-              {/* --- CHECKBOX FIX --- */}
+              {/* --- CHECKBOX FIX (SUDAH DIPERBAIKI DISINI) --- */}
               <div className="flex items-center gap-2 mt-3">
                 <input 
                   type="checkbox" 
@@ -169,7 +164,7 @@ export default function Register() {
 
               {error && <p className="text-red-500 text-xs font-medium">{error}</p>}
 
-              <button type="submit" disabled={isLoading} className="mt-2 w-full text-white font-bold py-3.5 rounded-lg bg-[#0a0a5c] hover:bg-blue-900 transition-all cursor-pointer">
+              <button type="submit" disabled={isLoading} className="mt-2 w-full text-white font-bold py-3.5 rounded-lg bg-[#0a0a5c] hover:bg-blue-900 transition-all">
                 {isLoading ? "Processing..." : "Sign Up"}
               </button>
             </form>
@@ -196,7 +191,7 @@ export default function Register() {
             
             {error && <p className="text-red-500 text-sm mb-3 text-center">{error}</p>}
 
-            <button onClick={handleVerifyOtp} disabled={isLoading} className="w-full text-white font-bold py-3.5 rounded-lg bg-[#0a0a5c] hover:bg-blue-900 transition-all cursor-pointer">
+            <button onClick={handleVerifyOtp} disabled={isLoading} className="w-full text-white font-bold py-3.5 rounded-lg bg-[#0a0a5c] hover:bg-blue-900 transition-all">
               {isLoading ? "Verifying..." : "Confirm Code"}
             </button>
             
