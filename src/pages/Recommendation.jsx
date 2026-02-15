@@ -83,13 +83,21 @@ export default function Recommendation() {
     const fetchUserFavorites = async () => {
       const token = localStorage.getItem("userToken");
       if (!token) return;
+
       try {
+        // Ambil list sepatu yang sudah di-favorite oleh user
         const response = await axios.get("http://localhost:8000/api/favorites/", {
           headers: { Authorization: `Token ${token}` },
         });
+
+        // Backend mengembalikan array object sepatu lengkap.
+        // Kita ambil "shoe_id" nya saja untuk disimpan di state favoriteIds.
+        // Pastikan backend mengirim field 'shoe_id' (string)
         const ids = response.data.map(item => item.shoe_id);
         setFavoriteIds(ids);
-      } catch (err) { console.error("Gagal load favorites", err); }
+      } catch (err) {
+        console.error("Gagal load favorites", err);
+      }
     };
     fetchUserFavorites();
   }, []);
@@ -188,16 +196,44 @@ export default function Recommendation() {
   // --- LOGIC ADD FAVORITE ---
   const handleAddFavorite = async (shoeId) => {
     const token = localStorage.getItem("userToken");
-    if (!token) { alert("Please login first."); return; }
+    
+    // 1. Validasi Login
+    if (!token) { 
+      alert("Please login first to save this shoe."); 
+      return; 
+    }
 
-    const isCurrentlyFavorite = favoriteIds.includes(shoeId);
-    setFavoriteIds((prevIds) => isCurrentlyFavorite ? prevIds.filter(id => id !== shoeId) : [...prevIds, shoeId]);
+    // Pastikan ID berupa string (karena di database tipe-nya Text/Varchar)
+    const idString = String(shoeId);
+
+    // 2. Cek status saat ini (lagi di-love atau tidak?)
+    const isCurrentlyFavorite = favoriteIds.includes(idString);
+
+    // 3. OPTIMISTIC UPDATE (Ubah warna duluan biar cepat)
+    setFavoriteIds((prevIds) => 
+      isCurrentlyFavorite 
+        ? prevIds.filter(id => id !== idString) // Kalau udah ada, hapus (jadi putih)
+        : [...prevIds, idString] // Kalau belum ada, tambah (jadi merah)
+    );
 
     try {
-      await axios.post("http://localhost:8000/api/favorites/toggle/", { shoe_id: String(shoeId) }, { headers: { Authorization: `Token ${token}` } });
+      // 4. Request ke Backend
+      await axios.post(
+        "http://localhost:8000/api/favorites/toggle/", 
+        { shoe_id: idString }, 
+        { headers: { Authorization: `Token ${token}` } }
+      );
+      // Sukses! Tidak perlu update state lagi karena sudah di langkah 3.
     } catch (err) {
       console.error("Failed to toggle favorite:", err);
-      setFavoriteIds((prevIds) => isCurrentlyFavorite ? [...prevIds, shoeId] : prevIds.filter(id => id !== shoeId));
+      
+      // 5. ROLLBACK (Kalau API error, balikin warnanya)
+      setFavoriteIds((prevIds) => 
+        isCurrentlyFavorite 
+          ? [...prevIds, idString] // Balikin jadi merah
+          : prevIds.filter(id => id !== idString) // Balikin jadi putih
+      );
+      alert("Gagal menyimpan. Cek koneksi internet.");
     }
   };
 
@@ -280,11 +316,24 @@ export default function Recommendation() {
                     <p className="text-gray-500 text-sm font-bold uppercase tracking-wider mb-1">{featuredShoe.brand}</p>
                     <h2 className="text-4xl font-serif font-bold text-gray-900 leading-tight">{featuredShoe.name}</h2>
                   </div>
-                  <button onClick={() => handleAddFavorite(featuredShoe.id || featuredShoe.shoe_id)} className="transition-transform active:scale-90">
-                    {favoriteIds.includes(featuredShoe.id || featuredShoe.shoe_id) ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10 text-red-500"><path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" /></svg>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation(); // Mencegah event bubbling jika ada
+                      // Gunakan shoe_id jika ada, jika tidak gunakan id, lalu konversi ke String
+                      const idToToggle = String(featuredShoe.shoe_id || featuredShoe.id);
+                      handleAddFavorite(idToToggle);
+                    }}
+                    className="transition-transform active:scale-90"
+                  >
+                    {/* Cek apakah ID ada di favoriteIds (pastikan konversi ke String juga) */}
+                    {favoriteIds.includes(String(featuredShoe.shoe_id || featuredShoe.id)) ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10 text-red-500">
+                        <path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" />
+                      </svg>
                     ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 text-gray-300 hover:text-red-400"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" /></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 text-gray-300 hover:text-red-400">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+                      </svg>
                     )}
                   </button>
                 </div>
@@ -380,11 +429,25 @@ export default function Recommendation() {
                       </div>
                     </div>
                     <div className="flex flex-row sm:flex-col items-center justify-between w-full sm:w-auto gap-3 mt-2 sm:mt-0">
-                      <button onClick={() => handleAddFavorite(shoe.id || shoe.shoe_id)} className="transition-transform active:scale-90 text-gray-400 hover:text-red-500">
-                        {favoriteIds.includes(shoe.id || shoe.shoe_id) ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 text-red-500"><path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" /></svg>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation(); // Biar tidak klik card-nya (kalau ada link detail)
+                          // PENTING: Gunakan shoe.shoe_id (dari API) atau shoe.id (dari Mock)
+                          handleAddFavorite(shoe.shoe_id || shoe.id);
+                        }} 
+                        className="transition-transform active:scale-90 text-gray-400 hover:text-red-500"
+                      >
+                        {/* Cek apakah ID sepatu ini ada di dalam list favoriteIds */}
+                        {favoriteIds.includes(String(shoe.shoe_id || shoe.id)) ? (
+                          // ICON MERAH (Filled)
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 text-red-500">
+                            <path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" />
+                          </svg>
                         ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" /></svg>
+                          // ICON OUTLINE (Kosong)
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+                          </svg>
                         )}
                       </button>
                       <button className="bg-[#000080] text-white text-xs font-bold px-5 py-2.5 rounded-lg hover:bg-blue-900 transition-colors whitespace-nowrap">Learn More</button>
