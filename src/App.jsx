@@ -15,20 +15,18 @@ import ForgotPassword from "./pages/ForgotPassword";
 import UpdatePassword from "./pages/UpdatePassword";
 import Favorites from "./pages/Favorites";
 import ShoeDetail from "./pages/ShoeDetail";
-// TAMBAHAN 1: Import halaman Search
 import Search from "./pages/Search"; 
+import Compare from "./pages/Compare"
 
 export default function App() {
   const location = useLocation();
   const isCustomLayoutPage = location.pathname === "/";
   return (
-    // PERUBAHAN 1: Tambah 'flex flex-col' di div paling luar
     <div className="font-sans text-gray-900 bg-white min-h-screen flex flex-col">
       
-      {/* Navbar ditaruh di LUAR <Routes> */}
       <Navbar />
 
-      {/* PERUBAHAN 2: Bungkus <Routes> pakai tag <main> dan kasih 'flex-grow pt-28' */}
+      {/* Main <Routes> pakai tag <main> */}
       <main className={`flex-grow ${isCustomLayoutPage ? "pt-22" : "pt-28"}`}>
         <Routes>
           
@@ -41,10 +39,9 @@ export default function App() {
           <Route path="/update-password" element={<UpdatePassword />} />
           <Route path="/about" element={<About />} />
           <Route path="/favorites" element={<Favorites />} />
-          
-          {/* TAMBAHAN 2: Daftarin rute /search */}
-          <Route path="/search" element={<Search />} />
           <Route path="/shoe/:slug" element={<ShoeDetail />} />
+          <Route path="/search" element={<Search />} />
+          <Route path="/compare" element={<Compare />} />
 
           {/* Kalau link ngawur -> Tampilkan 404 */}
           <Route path="*" element={<div className="text-center font-bold">404 - Page Not Found</div>} />
@@ -52,7 +49,6 @@ export default function App() {
         </Routes>
       </main>
 
-      {/* Footer sekarang bakal nurut di bawah */}
       <Footer />
       
     </div>
