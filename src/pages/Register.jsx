@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
+// 1. Gunakan instance api buatan kita
+import api from "../api/axios"; 
 import TermsModal from "../components/TermsModal";
 
 export default function Register() {
@@ -53,15 +54,14 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      // Tembak Django endpoint REGISTER
-      await axios.post("http://127.0.0.1:8000/api/register/", {
+      // 2. Gunakan instance api (URL otomatis ke Railway/Backend)
+      await api.post("/api/register/", {
         email: formData.email,
         password: formData.password
       });
 
-      // Sukses -> Pindah ke Form OTP
       setStep("verify"); 
-      setResendTimer(60); // Reset timer saat masuk halaman OTP
+      setResendTimer(60);
       alert("Kode OTP telah dikirim ke email kamu!");
 
     } catch (err) {
@@ -76,9 +76,10 @@ export default function Register() {
 
   // --- FUNGSI KIRIM ULANG OTP ---
   const handleResendCode = async () => {
-    setResendTimer(60); // Reset waktu jadi 60 detik lagi
+    setResendTimer(60);
     try {
-      await axios.post("http://127.0.0.1:8000/api/resend-otp/", {
+      // 3. Gunakan instance api
+      await api.post("/api/resend-otp/", {
         email: formData.email
       });
       alert("Kode OTP baru telah dikirim!");
@@ -95,11 +96,11 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      // Tembak Django endpoint VERIFY
-      await axios.post("http://127.0.0.1:8000/api/verify-otp/", {
+      // 4. Gunakan instance api
+      await api.post("/api/verify-otp/", {
         email: formData.email,
         otp: otpCode,
-        password: formData.password // Kirim pass lagi untuk disimpan ke DB
+        password: formData.password
       });
 
       alert("Account created successfully! Please Login.");
@@ -120,7 +121,6 @@ export default function Register() {
     <div className="min-h-screen flex items-start justify-center bg-[#f5f5f7] px-4 pt-20">
       <div className="w-full max-w-md bg-white p-6 md:p-8 rounded-2xl shadow-xl border border-slate-100">
         
-        {/* === TAMPILAN 1: FORM REGISTER === */}
         {step === "register" && (
           <>
             <div className="mb-5">
@@ -129,25 +129,21 @@ export default function Register() {
             </div>
 
             <form className="flex flex-col gap-3" onSubmit={handleRegister}>
-              {/* Input Email */}
               <div>
                 <label className="block text-slate-700 font-bold mb-1 text-sm">Email Address</label>
                 <input type="email" id="email" value={formData.email} onChange={handleChange} placeholder="runner@example.com" className="w-full px-4 py-2.5 rounded-lg border border-slate-300 bg-slate-50" required />
               </div>
 
-              {/* Input Password */}
               <div>
                 <label className="block text-slate-700 font-bold mb-1 text-sm">Password</label>
                 <input type="password" id="password" value={formData.password} onChange={handleChange} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 bg-slate-50" required />
               </div>
 
-              {/* Input Confirm Password */}
               <div>
                 <label className="block text-slate-700 font-bold mb-1 text-sm">Confirm Password</label>
                 <input type="password" id="confirmPassword" value={formData.confirmPassword} onChange={handleChange} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 bg-slate-50" required />
               </div>
 
-              {/* --- CHECKBOX FIX (SUDAH DIPERBAIKI DISINI) --- */}
               <div className="flex items-center gap-2 mt-3">
                 <input 
                   type="checkbox" 
@@ -173,7 +169,6 @@ export default function Register() {
           </>
         )}
 
-        {/* === TAMPILAN 2: FORM OTP === */}
         {step === "verify" && (
           <>
             <h2 className="text-2xl font-bold text-slate-800 mb-2">Verify Email</h2>
@@ -195,7 +190,6 @@ export default function Register() {
               {isLoading ? "Verifying..." : "Confirm Code"}
             </button>
             
-            {/* resend code */}
             <div className="mt-6 text-center text-sm">
               {resendTimer > 0 ? (
                 <p className="text-slate-500">
@@ -218,7 +212,6 @@ export default function Register() {
 
       </div>
       
-      {/* MODAL SYARAT & KETENTUAN */}
       {showTerms && <TermsModal onClose={() => setShowTerms(false)} onAccept={handleAgreeFromModal} />}
     </div>
   );
