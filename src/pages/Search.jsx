@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom"; // Pastikan Link diimport
-import axios from "axios";
+import api from "../api/axios"; 
 
 export default function Search() {
   const [searchParams] = useSearchParams();
@@ -15,7 +15,7 @@ export default function Search() {
     const token = localStorage.getItem("userToken");
 
     if (!token) {
-      alert("Please login first to save this shoe to your favorites.");
+      setError("Please login first to save this shoe to your favorites.");
       return;
     }
 
@@ -28,8 +28,8 @@ export default function Search() {
 
     try {
       // 2. Tembak API
-      await axios.post(
-        "http://localhost:8000/api/favorites/toggle/",
+      await api.post(
+        "/api/favorites/toggle/",
         { shoe_id: String(shoe.shoe_id) }, // Pastikan ID jadi String
         {
           headers: {
@@ -45,7 +45,7 @@ export default function Search() {
           s.shoe_id === shoe.shoe_id ? { ...s, isFavorite: !s.isFavorite } : s
         )
       );
-      alert("Failed to update favorite. Please try again.");
+      setError("Failed to update favorite status. Please try again.");
     }
   };
 
@@ -65,8 +65,8 @@ export default function Search() {
         // AMBIL TOKEN DULU
         const token = localStorage.getItem("userToken");
 
-        const response = await axios.get(
-          `http://localhost:8000/api/shoes/search/?q=${query}`,
+        const response = await api.get(
+          `/api/shoes/search/?q=${query}`,
           {
             // PENTING: Kirim token biar Backend tau mana yang udah dilike
             headers: token ? { Authorization: `Token ${token}` } : {},

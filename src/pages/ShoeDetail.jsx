@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { FaHeart, FaRegHeart, FaStar, FaPlus } from "react-icons/fa";
-import axios from "axios";
+import api from "../api/axios"; 
 
 export default function ShoeDetail() {
   const { slug } = useParams();
@@ -39,8 +39,8 @@ export default function ShoeDetail() {
         // Mengambil token agar isFavorite tetap sinkron saat refresh
         const token = localStorage.getItem("userToken");
 
-        const response = await axios.get(
-          `http://localhost:8000/api/shoes/${slug}/`,
+        const response = await api.get(
+          `/api/shoes/${slug}/`,
           {
             headers: token ? { Authorization: `Token ${token}` } : {},
           }
@@ -75,8 +75,8 @@ export default function ShoeDetail() {
     }
 
     try {
-      await axios.post(
-        "http://localhost:8000/api/add-review/",
+      await api.post(
+        "/api/add-review/",
         {
           shoe_id: shoeData.shoe_id,
           rating: newReview.rating,
@@ -127,8 +127,8 @@ export default function ShoeDetail() {
     const previousStatus = shoeData.isFavorite;
     setShoeData({ ...shoeData, isFavorite: !previousStatus });
     try {
-      const response = await axios.post(
-        "http://localhost:8000/api/favorites/toggle/",
+      const response = await api.post(
+        "/api/favorites/toggle/",
         { shoe_id: shoeData.shoe_id },
         {
           headers: { Authorization: `Token ${token}` },

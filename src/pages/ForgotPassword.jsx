@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import axios from "axios";
+import api from "../api/axios"; 
 
 export default function ForgotPassword() {
   // STATE
@@ -18,7 +18,7 @@ export default function ForgotPassword() {
 
     try {
       // Arahkan ke endpoint FORGOT PASSWORD
-      await axios.post("http://127.0.0.1:8000/api/forgot-password/", { 
+      await api.post("/api/forgot-password/", { 
         email: email 
       });
       

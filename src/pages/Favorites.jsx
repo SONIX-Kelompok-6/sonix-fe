@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import axios from "axios";
+import api from "../api/axios"; 
 
 export default function Favorites() {
   const [favorites, setFavorites] = useState([]);
@@ -18,7 +18,7 @@ export default function Favorites() {
       }
 
       try {
-        const response = await axios.get("http://localhost:8000/api/favorites/", {
+        const response = await api.get("/api/favorites/", {
           headers: { Authorization: `Token ${token}` },
         });
         setFavorites(response.data);
@@ -46,8 +46,8 @@ export default function Favorites() {
     setFavorites((prev) => prev.filter((shoe) => shoe.shoe_id !== shoeId));
 
     try {
-      await axios.post(
-        "http://localhost:8000/api/favorites/toggle/",
+      await api.post(
+        "/api/favorites/toggle/",
         { shoe_id: String(shoeId) },
         { headers: { Authorization: `Token ${token}` } }
       );
