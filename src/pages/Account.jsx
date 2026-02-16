@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../api/axios"; 
 
 export default function Account() {
   const navigate = useNavigate();
@@ -30,7 +30,7 @@ export default function Account() {
       try {
         // 2. Request ke Backend
         // Ganti URL ini sesuai endpoint Django/Backend kamu
-        const response = await axios.get('http://localhost:8000/api/user-profile/', {
+        const response = await api.get('/api/user-profile/', {
           headers: { 
             'Authorization': `Token ${token}` 
           }
@@ -72,7 +72,7 @@ export default function Account() {
     const token = localStorage.getItem("userToken");
     try {
       if (token) {
-        await axios.post('http://localhost:8000/api/logout/', {}, {
+        await api.post('/api/logout/', {}, {
           headers: { 'Authorization': `Token ${token}` }
         });
       }

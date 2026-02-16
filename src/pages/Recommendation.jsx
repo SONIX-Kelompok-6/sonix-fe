@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import axios from "axios"; 
+import api from "../api/axios"; 
 import { useNavigate, Link } from "react-router-dom"; // Tambah import Link
 
 // --- IMPORT ASSETS (Sama seperti sebelumnya) ---
@@ -66,7 +66,7 @@ export default function Recommendation() {
     
     setProfileLoading(true);
     try {
-      const response = await axios.get("http://localhost:8000/api/profile/", {
+      const response = await api.get("/api/profile/", {
         headers: { Authorization: `Token ${token}` },
       });
       const data = response.data; 
@@ -95,7 +95,7 @@ export default function Recommendation() {
       const token = localStorage.getItem("userToken");
       if (!token) return;
       try {
-        const response = await axios.get("http://localhost:8000/api/favorites/", {
+        const response = await api.get("/api/favorites/", {
           headers: { Authorization: `Token ${token}` },
         });
         const ids = response.data.map(item => item.shoe_id);
@@ -148,7 +148,7 @@ export default function Recommendation() {
     let endpoint = "";
 
     if (step === "road") {
-        endpoint = "http://localhost:8000/api/recommendations/road/";
+        endpoint = "/api/recommendations/road/";
         payload = {
             running_purpose: roadData.purpose,
             pace: roadData.pace,
@@ -161,7 +161,7 @@ export default function Recommendation() {
             season: roadData.season
         };
     } else if (step === "trail") {
-        endpoint = "http://localhost:8000/api/recommendations/trail/";
+        endpoint = "/api/recommendations/trail/";
         payload = {
             terrain: trailData.terrain,
             rock_sensitive: trailData.rockSensitivity,
@@ -176,7 +176,7 @@ export default function Recommendation() {
     }
 
     try {
-        const response = await axios.post(endpoint, payload, {
+        const response = await api.post(endpoint, payload, {
            headers: token ? { Authorization: `Token ${token}` } : {}
         });
         if (Array.isArray(response.data)) setSearchResults(response.data);
@@ -206,11 +206,11 @@ export default function Recommendation() {
     setFavoriteIds((prevIds) => isCurrentlyFavorite ? prevIds.filter(id => id !== idString) : [...prevIds, idString]);
 
     try {
-      await axios.post("http://localhost:8000/api/favorites/toggle/", { shoe_id: idString }, { headers: { Authorization: `Token ${token}` } });
+      await api.post("/api/favorites/toggle/", { shoe_id: idString }, { headers: { Authorization: `Token ${token}` } });
     } catch (err) {
       console.error("Failed to toggle favorite:", err);
       setFavoriteIds((prevIds) => isCurrentlyFavorite ? [...prevIds, idString] : prevIds.filter(id => id !== idString));
-      alert("Gagal menyimpan. Cek koneksi internet."); // Ini boleh tetep alert krn user interaksi
+      setError("Failed to update favorite status. Please try again.");
     }
   };
 

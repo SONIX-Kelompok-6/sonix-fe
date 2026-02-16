@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import axios from "axios";
+import api from "../api/axios"; 
 
 export default function UpdatePassword() {
   const navigate = useNavigate();
@@ -54,7 +54,7 @@ export default function UpdatePassword() {
 
     try {
       // 3. Arahkan ke API Backend
-      await axios.post("http://127.0.0.1:8000/api/reset-password/", {
+      await api.post("/api/reset-password/", {
         access_token: accessToken,
         refresh_token: refreshToken,
         new_password: formData.password

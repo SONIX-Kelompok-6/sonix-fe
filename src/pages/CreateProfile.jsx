@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from "../api/axios"; 
 import { useNavigate } from 'react-router-dom';
 
 import InfoTooltip from '../components/InfoTooltip';
@@ -67,7 +67,7 @@ const CreateProfile = () => {
         // weight_kg: parseInt(formData.weight_kg)
       };
 
-      await axios.post('http://127.0.0.1:8000/api/profile/', payload, {
+      await api.post('/api/profile/', payload, {
         headers: { Authorization: `Token ${token}` }
       });
 
