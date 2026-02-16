@@ -1,18 +1,17 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom"; 
-// ✅ PENTING: Import api instance yang sudah kita setting (bukan axios biasa)
 import api from "../api/axios"; 
 
 export default function Login() {
   const navigate = useNavigate(); 
 
-  // 1. STATE
-  const [formData, setFormData] = useState({
-    email: "",
+  // renew: input username to login
+const [formData, setFormData] = useState({
+    identifier: "", // identifier means email or username
     password: ""
   });
   const [error, setError] = useState(""); 
-  const [isLoading, setIsLoading] = useState(false); 
+  const [isLoading, setIsLoading] = useState(false);
 
   // 2. HANDLER: Saat ngetik
   const handleChange = (e) => {
@@ -30,7 +29,7 @@ export default function Login() {
       // ✅ UPDATE: Pakai 'api.post' dan path relatif
       // Base URL (Railway) akan otomatis ditempel sama axios.js
       const response = await api.post("/api/login/", {
-        email: formData.email,
+        identifier: formData.identifier,
         password: formData.password
       });
 
@@ -53,10 +52,8 @@ export default function Login() {
       console.error("Login Error:", err);
       // Error Handling
       if (err.response && err.response.data) {
-        // Tampilkan pesan error dari Backend (misal: "Wrong credentials")
-        setError(err.response.data.error || "Invalid email or password.");
+        setError(err.response.data.error || "Invalid credentials or password.");
       } else if (err.request) {
-        // Tampilkan jika Backend mati/tidak bisa dihubungi
         setError("Network Error. Cannot connect to server.");
       } else {
         setError("Something went wrong.");
@@ -82,12 +79,12 @@ export default function Login() {
           
           <div>
             <label className="block text-slate-700 font-bold mb-2 text-sm" htmlFor="email">
-              Email Address
+              Username or Email Address
             </label>
             <input 
-              type="email" 
-              id="email" 
-              value={formData.email} 
+              type="identifier" 
+              id="identifier" 
+              value={formData.identifier} 
               onChange={handleChange} 
               placeholder="runner@example.com" 
               className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100 transition bg-slate-50"
