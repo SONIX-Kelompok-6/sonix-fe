@@ -532,7 +532,6 @@ export default function Compare() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
