@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"; 
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../api/axios"; 
 import logoImg from '../assets/logo-dark.svg'; 
 
 export default function Navbar() {
@@ -24,7 +24,7 @@ export default function Navbar() {
       if (token) {
         try {
           // Panggil API yang sama dengan halaman Account
-          const response = await axios.get('http://localhost:8000/api/user-profile/', {
+          const response = await api.get("/api/login/", {
             headers: { 'Authorization': `Token ${token}` }
           });
           // Simpan username dari respon backend
@@ -56,7 +56,7 @@ export default function Navbar() {
     const token = localStorage.getItem("userToken");
     try {
       if (token) {
-        await axios.post('http://localhost:8000/api/logout/', {}, {
+        await api.post("/api/logout/", {}, {
           headers: { 'Authorization': `Token ${token}` }
         });
       }
