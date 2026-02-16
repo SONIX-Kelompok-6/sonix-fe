@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useEffect } from "react";
 import api from "../api/axios"; 
-import { useNavigate, Link } from "react-router-dom"; // Tambah import Link
+import { useNavigate, Link } from "react-router-dom";
+// --- IMPORT SERVICE ML ---
+import { getRecommendations, sendInteraction, getUserFeed } from "../services/SonixMl"; 
 
-// --- IMPORT ASSETS (Sama seperti sebelumnya) ---
+// --- IMPORT ASSETS ---
 import roadImg from "../assets/recommendation-page/road.png";
 import trailImg from "../assets/recommendation-page/trail.png";
 import imgNarrow from '../assets/profile-images/foot-narrow.svg';
@@ -12,17 +14,13 @@ import imgFlat from '../assets/profile-images/arch-flat.svg';
 import imgNormal from '../assets/profile-images/arch-normal.svg';
 import imgHigh from '../assets/profile-images/arch-high.svg';
 
-// --- DATA DUMMY (Sama seperti sebelumnya) ---
-const MOCK_SHOES = [
-  { id: 1, name: "Nike Winflo 10", brand: "Nike", weight: 280, rating: 4.9, img: "https://static.nike.com/a/images/c_limit,w_592,f_auto/t_product_v1/56c64601-5735-4340-9e73-0402fb0c9043/winflo-10-road-running-shoes-55K0qf.png" },
-  { id: 2, name: "Saucony Ride 16", brand: "Saucony", weight: 250, rating: 4.8, img: "https://s7d4.scene7.com/is/image/WolverineWorldWide/S20830-85_1?wid=800&hei=640&fmt=jpeg&qlt=80,0&op_sharpen=0&resMode=sharp2&op_usm=0.5,1.0,8,0&iccEmbed=0&printRes=72" },
-  { id: 3, name: "ASICS Dynablast 3", brand: "ASICS", weight: 258, rating: 4.9, img: "https://images.asics.com/is/image/asics/1011B460_402_SR_RT_GLB?$zoom$" },
-  { id: 4, name: "Brooks Ghost 15", brand: "Brooks", weight: 286, rating: 4.7, img: "https://www.brooksrunning.com/on/demandware.static/-/Sites-brooks-master-catalog/default/dw204f4705/original/110393/110393-020-l-ghost-15-mens-neutral-cushion-running-shoe.png" },
-  { id: 5, name: "HOKA Clifton 9", brand: "HOKA", weight: 248, rating: 4.6, img: "https://www.hoka.com/on/demandware.static/-/Sites-HOKA-US-master/default/dw27768565/images/primary/1127895-BBLC_1.jpg" },
-  { id: 6, name: "Nike Pegasus 40", brand: "Nike", weight: 275, rating: 4.9, img: "https://static.nike.com/a/images/t_PDP_1280_v1/f_auto,q_auto:eco/a0c4f107-c75c-4235-950e-55248270c53d/pegasus-40-road-running-shoes-TCcnd9.png" },
-];
-
 const BRANDS_LIST = ["ASICS", "Nike", "New Balance", "Adidas", "Saucony", "HOKA", "Brooks", "On", "PUMA", "Altra", "Mizuno", "Salomon", "Under Armour", "Skechers", "Reebok", "Merrell", "Topo Athletic"];
+
+// Helper untuk normalisasi teks (Huruf besar di awal)
+const capitalizeFirst = (str) => {
+  if (!str) return null;
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+};
 
 export default function Recommendation() {
   const navigate = useNavigate();
@@ -31,15 +29,15 @@ export default function Recommendation() {
   const [showMore, setShowMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
-  
-  // 1. TAMBAH STATE ERROR
   const [error, setError] = useState(null);
 
   // --- STATE DATA ---
   const [searchResults, setSearchResults] = useState([]); 
   const [favoriteIds, setFavoriteIds] = useState([]); 
+  // State untuk "You Might Also Like" (Real-time AI)
+  const [realtimeRecs, setRealtimeRecs] = useState([]);
 
-  // STATES FISIK (Sama)
+  // STATES INPUT
   const [commonData, setCommonData] = useState({ footWidth: null, archType: null, orthotics: null });
   const [roadData, setRoadData] = useState({ purpose: null, pace: null, cushion: null, season: null, stability: null, strike: null });
   const [trailData, setTrailData] = useState({ terrain: null, pace: null, season: null, strike: null, waterResistant: null, rockSensitivity: null });
@@ -47,49 +45,31 @@ export default function Recommendation() {
   const [sortBy, setSortBy] = useState("recommended");
 
   // ==============================================
-  // 2. MODIFIKASI AUTH GUARD (JANGAN ALERT)
+  // 1. HYBRID FEED TRIGGER (Saat Masuk Pertama Kali)
   // ==============================================
   useEffect(() => {
     const token = localStorage.getItem("userToken");
+    const userId = localStorage.getItem("userId");
+
     if (!token) {
-      // GANTI ALERT DENGAN SET ERROR
       setError("Please login to use the Recommendation feature.");
     } else {
-        setError(null);
+      setError(null);
+      if (userId) {
+        const fetchFeed = async () => {
+          try {
+            const feed = await getUserFeed(userId);
+            if (feed && feed.length > 0) {
+              setSearchResults(feed);
+            }
+          } catch (err) { console.error("Feed error:", err); }
+        };
+        fetchFeed();
+      }
     }
   }, []);
 
-  // --- FETCH USE MY PROFILE ---
-  const handleUseProfile = async () => {
-    const token = localStorage.getItem("userToken");
-    if (!token) { setError("Please login to use profile."); return; } // Ganti alert jadi error banner
-    
-    setProfileLoading(true);
-    try {
-      const response = await api.get("/api/profile/", {
-        headers: { Authorization: `Token ${token}` },
-      });
-      const data = response.data; 
-      let mappedArch = null;
-      if (data.arch_type === "Flat") mappedArch = "Flat Arch";
-      else if (data.arch_type === "Normal") mappedArch = "Normal Arch";
-      else if (data.arch_type === "High") mappedArch = "High Arch";
-
-      setCommonData({
-        footWidth: data.foot_width, 
-        archType: mappedArch,
-        orthotics: data.uses_orthotics ? "Yes" : "No"
-      });
-      setError(null); // Clear error kalau sukses
-    } catch (err) { 
-        console.error("Gagal load profile", err);
-        setError("Failed to load profile. Please try again."); 
-    } finally { 
-        setProfileLoading(false); 
-    }
-  };
-
-  // --- FETCH FAVORITES (Sama) ---
+  // --- FETCH FAVORITES ---
   useEffect(() => {
     const fetchUserFavorites = async () => {
       const token = localStorage.getItem("userToken");
@@ -105,7 +85,135 @@ export default function Recommendation() {
     fetchUserFavorites();
   }, []);
 
-  // --- HELPERS (Sama) ---
+ // --- HANDLE USE MY PROFILE (FIXED ARCH MATCHING) ---
+  const handleUseProfile = async () => {
+    const token = localStorage.getItem("userToken");
+    if (!token) { setError("Please login to use profile."); return; }
+    setProfileLoading(true);
+    try {
+      const response = await api.get("/api/profile/", { headers: { Authorization: `Token ${token}` } });
+      
+      const userProfile = response.data.profile || response.data;
+
+      // 1. PERBAIKAN DISINI: Hapus kata " Arch" biar cocok sama Value tombol
+      let mappedArch = null;
+      if (userProfile.arch_type) {
+         const archLower = userProfile.arch_type.toLowerCase();
+         // Value tombol kamu adalah "Flat", "High", "Normal". Bukan "Flat Arch".
+         if (archLower.includes("flat")) mappedArch = "Flat";
+         else if (archLower.includes("high")) mappedArch = "High";
+         else mappedArch = "Normal";
+      }
+
+      // 2. Normalisasi Foot Width
+      let mappedWidth = null;
+      if (userProfile.foot_width) {
+          mappedWidth = capitalizeFirst(userProfile.foot_width.trim());
+      }
+
+      setCommonData({ 
+          footWidth: mappedWidth, 
+          archType: mappedArch,  // Sekarang isinya "Normal", cocok dengan value tombol!
+          orthotics: userProfile.uses_orthotics ? "Yes" : "No" 
+      });
+      setError(null);
+    } catch (err) { setError("Failed to load profile."); } finally { setProfileLoading(false); }
+  };
+
+  // --- HANDLE FIND (VERSI HYBRID: ML + DB REALTIME) ---
+  const handleFind = async () => {
+    const userId = localStorage.getItem("userId");
+    if (!userId) { setError("User ID not found. Please re-login."); return; }
+
+    setLoading(true);
+    const cleanArch = commonData.archType; 
+    const type = step === "road" ? "road" : "trail";
+    let cleanWater = trailData.waterResistant;
+    if (cleanWater === "Water Proof") cleanWater = "Waterproof";
+
+    const payload = step === "road" ? {
+      running_purpose: roadData.purpose,
+      pace: roadData.pace,
+      orthotic_usage: commonData.orthotics,
+      arch_type: cleanArch,
+      strike_pattern: roadData.strike,
+      cushion_preferences: roadData.cushion,
+      foot_width: commonData.footWidth,
+      stability_need: roadData.stability,
+      season: roadData.season
+    } : {
+      terrain: trailData.terrain,
+      rock_sensitive: trailData.rockSensitivity,
+      pace: trailData.pace,
+      orthotic_usage: commonData.orthotics,
+      arch_type: cleanArch,
+      strike_pattern: trailData.strike,
+      foot_width: commonData.footWidth,
+      season: trailData.season,
+      water_resistance: cleanWater
+    };
+
+    try {
+      // 1. Minta Rekomendasi ke AI (Cuma butuh daftar slug-nya)
+      const mlResults = await getRecommendations(type, payload);
+
+      if (!mlResults || mlResults.length === 0) {
+        setSearchResults([]);
+        setStep("results");
+        return;
+      }
+
+      // 2. Ambil ID saja dari hasil ML (biasanya field 'id' atau 'shoe_id')
+      const recommendedIds = mlResults.map(shoe => shoe.id || shoe.shoe_id);
+
+      // 3. Ambil data asli dari DB menggunakan ID (Hydration)
+      // Kita tembak endpoint baru: /api/shoes/id/${id}/
+      const freshDataPromises = recommendedIds.map(id => 
+        api.get(`/api/shoes/id/${id}/`).then(res => res.data).catch(() => null)
+      );
+
+      const freshShoes = await Promise.all(freshDataPromises);
+      
+      // 4. Update state (Rating sekarang pasti 5.0 atau sesuai DB!)
+      setSearchResults(freshShoes.filter(s => s !== null));
+      setError(null);
+      setStep("results");
+
+    } catch (err) {
+      setError("AI Engine is busy. Please try again.");
+    } finally { 
+      setLoading(false); 
+    }
+  };
+
+  // --- HANDLE ADD FAVORITE (DUAL WRITE) ---
+  const handleAddFavorite = async (shoeId) => {
+    const token = localStorage.getItem("userToken");
+    const userId = localStorage.getItem("userId");
+    if (!token) { setError("Please login to save favorites."); return; }
+
+    const idString = String(shoeId);
+    const isCurrentlyFavorite = favoriteIds.includes(idString);
+
+    setFavoriteIds((prevIds) => isCurrentlyFavorite ? prevIds.filter(id => id !== idString) : [...prevIds, idString]);
+
+    try {
+      await api.post("/api/favorites/toggle/", { shoe_id: idString }, { headers: { Authorization: `Token ${token}` } });
+      
+      if (!isCurrentlyFavorite && userId) {
+        const feedbackRecs = await sendInteraction(userId, idString, 'like');
+        if (feedbackRecs && feedbackRecs.length > 0) {
+            setRealtimeRecs(feedbackRecs);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to toggle favorite:", err);
+      setFavoriteIds((prevIds) => isCurrentlyFavorite ? [...prevIds, idString] : prevIds.filter(id => id !== idString));
+      setError("Failed to sync with server.");
+    }
+  };
+
+  // --- LOGIC DISPLAY, SORT, & FILTER (DIPERBAIKI) ---
   const handleToggleSelect = (category, value) => {
     const commonKeys = ['footWidth', 'archType', 'orthotics'];
     if (commonKeys.includes(category)) {
@@ -130,113 +238,56 @@ export default function Recommendation() {
     return false;
   };
 
-  // --- HANDLE FIND (Sama) ---
-  const handleFind = async () => {
-    const token = localStorage.getItem("userToken");
-    if (!token) {
-        setError("Please login to find shoes.");
-        return;
-    }
-
-    setLoading(true);
-    // ... Logic payload sama ...
-    const cleanArch = commonData.archType ? commonData.archType.replace(" Arch", "") : null;
-    let cleanWater = trailData.waterResistant;
-    if (cleanWater === "Water Proof") cleanWater = "Waterproof";
-
-    let payload = {};
-    let endpoint = "";
-
-    if (step === "road") {
-        endpoint = "/api/recommendations/road/";
-        payload = {
-            running_purpose: roadData.purpose,
-            pace: roadData.pace,
-            orthotic_usage: commonData.orthotics,
-            arch_type: cleanArch,
-            strike_pattern: roadData.strike,
-            cushion_preferences: roadData.cushion,
-            foot_width: commonData.footWidth,
-            stability_need: roadData.stability,
-            season: roadData.season
-        };
-    } else if (step === "trail") {
-        endpoint = "/api/recommendations/trail/";
-        payload = {
-            terrain: trailData.terrain,
-            rock_sensitive: trailData.rockSensitivity,
-            pace: trailData.pace,
-            orthotic_usage: commonData.orthotics,
-            arch_type: cleanArch,
-            strike_pattern: trailData.strike,
-            foot_width: commonData.footWidth,
-            season: trailData.season,
-            water_resistance: cleanWater
-        };
-    }
-
-    try {
-        const response = await api.post(endpoint, payload, {
-           headers: token ? { Authorization: `Token ${token}` } : {}
-        });
-        if (Array.isArray(response.data)) setSearchResults(response.data);
-        else if (response.data.results) setSearchResults(response.data.results);
-        else setSearchResults([]); 
-        
-        setError(null);
-        setStep("results");
-    } catch (err) {
-        console.error("Error finding shoes:", err);
-        setError("Failed to fetch recommendations.");
-        setSearchResults([]); 
-        setStep("results");
-    } finally {
-        setLoading(false);
-    }
-  };
-
-  // --- HANDLE ADD FAVORITE (Sama, tapi alert diganti error banner jika mau) ---
-  const handleAddFavorite = async (shoeId) => {
-    const token = localStorage.getItem("userToken");
-    if (!token) { setError("Please login to save favorites."); return; } // Ganti alert
-
-    const idString = String(shoeId);
-    const isCurrentlyFavorite = favoriteIds.includes(idString);
-
-    setFavoriteIds((prevIds) => isCurrentlyFavorite ? prevIds.filter(id => id !== idString) : [...prevIds, idString]);
-
-    try {
-      await api.post("/api/favorites/toggle/", { shoe_id: idString }, { headers: { Authorization: `Token ${token}` } });
-    } catch (err) {
-      console.error("Failed to toggle favorite:", err);
-      setFavoriteIds((prevIds) => isCurrentlyFavorite ? [...prevIds, idString] : prevIds.filter(id => id !== idString));
-      setError("Failed to update favorite status. Please try again.");
-    }
-  };
-
-  // ... (Logic Display, Sort, UI Helpers SAMA) ...
   const handleBrandToggle = (brand) => { if (selectedBrands.includes(brand)) setSelectedBrands(selectedBrands.filter((b) => b !== brand)); else setSelectedBrands([...selectedBrands, brand]); };
-  const sourceData = searchResults.length > 0 ? searchResults : MOCK_SHOES; 
+  
+  const sourceData = searchResults.length > 0 ? searchResults : []; 
   const featuredShoe = sourceData[0]; 
   const availableListShoes = sourceData.slice(1);
+  
+  // --- PERBAIKAN FILTERING DISINI ---
   const filteredListShoes = useMemo(() => {
-    let result = availableListShoes;
-    if (selectedBrands.length > 0) result = result.filter(shoe => selectedBrands.includes(shoe.brand));
-    if (sortBy === "lowHigh") result = [...result].sort((a, b) => a.weight - b.weight);
-    else if (sortBy === "highLow") result = [...result].sort((a, b) => b.weight - a.weight);
+    let result = [...availableListShoes]; // Copy array
+
+    // 1. Filter Brand (Robust & Case Insensitive)
+    if (selectedBrands.length > 0) {
+        result = result.filter(shoe => {
+            if (!shoe.brand) return false;
+            // Bersihkan data brand (kecilkan huruf & hapus spasi)
+            const shoeBrandClean = shoe.brand.toString().toLowerCase().trim();
+            // Cek apakah ada di selectedBrands (yang juga dibersihkan)
+            return selectedBrands.some(selected => 
+                selected.toLowerCase().trim() === shoeBrandClean
+            );
+        });
+    }
+
+    // 2. Sorting
+    if (sortBy === "lowHigh") result.sort((a, b) => (Number(a.weight_lab_oz) || 999) - (Number(b.weight_lab_oz) || 999));
+    else if (sortBy === "highLow") result.sort((a, b) => (Number(b.weight_lab_oz) || 0) - (Number(a.weight_lab_oz) || 0));
+    
     return result;
   }, [selectedBrands, sortBy, availableListShoes]);
-  const widthOptions = [{ label: 'Narrow', img: imgNarrow }, { label: 'Regular', img: imgRegular }, { label: 'Wide', img: imgWide }];
+
+  // Options UI
+  const widthOptions = [{ label: 'Narrow', value: 'Narrow', img: imgNarrow }, { label: 'Regular', value: 'Regular', img: imgRegular }, { label: 'Wide', value: 'Wide', img: imgWide }];
   const archOptions = [{ label: 'Flat Arch', value: 'Flat', img: imgFlat }, { label: 'Normal Arch', value: 'Normal', img: imgNormal }, { label: 'High Arch', value: 'High', img: imgHigh }];
   const activeStyle = "border-blue-600 bg-blue-50 scale-105 shadow-md";
   const inactiveStyle = "border-gray-200 hover:border-blue-300";
+  
   const SelectionGroup = ({ label, options, category, required = false }) => (
     <div className="mb-6 text-left">
       <label className="block text-xs font-bold mb-3 uppercase text-gray-700">{label} {required && <span className="text-red-500">*</span>}</label>
       <div className="flex gap-3">
         {options.map((opt) => {
-          const isSelected = getCurrentValue(category) === opt;
-          return (<button key={opt} onClick={() => handleToggleSelect(category, opt)} className={`flex-1 py-3 px-2 text-[11px] rounded-xl border-2 transition-all duration-200 font-bold ${isSelected ? 'border-blue-600 bg-blue-50 text-blue-900 shadow-md scale-105' : 'border-gray-200 text-gray-600 bg-white hover:border-blue-300'}`}>{opt}</button>)
+          // Tangani opsi yang punya value terpisah atau pakai label langsung
+          const valToCheck = opt.value || opt.label || opt; 
+          const isSelected = getCurrentValue(category) === valToCheck;
+          
+          return (
+            <button key={opt.label || opt} onClick={() => handleToggleSelect(category, valToCheck)} className={`flex-1 py-3 px-2 text-[11px] rounded-xl border-2 transition-all duration-200 font-bold ${isSelected ? 'border-blue-600 bg-blue-50 text-blue-900 shadow-md scale-105' : 'border-gray-200 text-gray-600 bg-white hover:border-blue-300'}`}>
+                {opt.label || opt}
+            </button>
+          )
         })}
       </div>
     </div>
@@ -246,14 +297,11 @@ export default function Recommendation() {
   if (step === "menu") {
     return (
       <div className="bg-white rounded-3xl shadow-xl w-[90%] max-w-[400px] p-8 mx-auto my-10 border border-gray-100 flex flex-col items-center">
-        
-        {/* 3. PASANG BANNER PINK DISINI (JIKA ERROR) */}
         {error && (
             <div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2">
                 <span>{error}</span>
             </div>
         )}
-
         <h2 className="text-center font-bold tracking-[0.1em] mb-5 text-gray-800 text-xl">TYPES OF RUNNING</h2>
         <div className="flex flex-col gap-6 w-full">
           <div onClick={() => {if(!error) {setStep("road"); setShowMore(false);} }} className={`relative rounded-2xl overflow-hidden group shadow-md transition-all ${error ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-xl'}`}>
@@ -271,13 +319,8 @@ export default function Recommendation() {
 
   // --- RENDER RESULT PAGE ---
   if (step === "results") {
-      // (Render Results Page SAMA PERSIS dengan sebelumnya, tidak ada perubahan)
-      // Saya singkat agar tidak kepanjangan, copy dari kode sebelumnya
       return (
         <div className="min-h-screen bg-gray-50 p-6 font-sans">
-           {/* ... Paste Layout Result Page Disini ... */}
-           {/* Karena User sudah login (lolos menu), kecil kemungkinan error auth disini */}
-           {/* Tapi jika ada error fetch, bisa tampilkan banner serupa */}
            <div className="max-w-6xl mx-auto">
                <div className="flex flex-col gap-4 mb-6">
                  <div className="flex items-center gap-4">
@@ -286,12 +329,11 @@ export default function Recommendation() {
                  </div>
                </div>
 
-               {featuredShoe && (
+               {featuredShoe ? (
                    <div className="bg-white rounded-2xl shadow-sm p-8 mb-10 flex flex-col md:flex-row items-center gap-8 border border-gray-100 relative overflow-hidden">
-                       {/* ... Featured Shoe Content ... */}
                        <div className="absolute top-0 left-0 bg-yellow-400 text-yellow-900 text-xs font-bold px-4 py-1 rounded-br-xl shadow-sm z-20">TOP MATCH</div>
                        <div className="w-full md:w-1/2 flex justify-center bg-blue-50 rounded-xl p-6 relative">
-                           <img src={featuredShoe.img || featuredShoe.image_url} alt={featuredShoe.name} className="w-[80%] object-contain drop-shadow-xl z-10 hover:scale-110 transition-transform duration-500" />
+                           <img src={featuredShoe.img || featuredShoe.img_url} alt={featuredShoe.name} className="w-[80%] object-contain drop-shadow-xl z-10 hover:scale-110 transition-transform duration-500" />
                        </div>
                        <div className="w-full md:w-1/2 space-y-4">
                            <div className="flex justify-between items-start">
@@ -310,17 +352,47 @@ export default function Recommendation() {
                                    )}
                                </button>
                            </div>
-                           <p className="text-xl text-gray-700">Weight : {featuredShoe.weight}g</p>
+                           <p className="text-xl text-gray-700">Weight : {featuredShoe.weight_lab_oz}oz</p>
                            <div className="flex items-center gap-2 mb-4">
                                <svg className="w-6 h-6 text-gray-800 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
-                               <span className="text-xl font-bold text-gray-800">{featuredShoe.rating}</span>
+                               <span className="text-xl font-bold text-gray-800">{featuredShoe.rating ? featuredShoe.rating.toFixed(1) : "0.0"}</span>
                            </div>
-                           <button className="bg-[#000080] text-white px-8 py-3 rounded-lg font-bold text-lg hover:bg-blue-900 transition-colors shadow-lg">Learn More</button>
+                           {/* --- PERBAIKAN LEARN MORE DISINI --- */}
+                           <button 
+                                onClick={() => navigate(`/shoe/${featuredShoe.slug || featuredShoe.id}`)}
+                                className="bg-[#000080] text-white px-8 py-3 rounded-lg font-bold text-lg hover:bg-blue-900 transition-colors shadow-lg"
+                           >
+                               Learn More
+                           </button>
                        </div>
                    </div>
+               ) : (
+                  <div className="text-center py-20 text-gray-500 bg-white rounded-2xl mb-10 shadow-sm border border-gray-100">
+                     <p className="text-lg">No recommendations found yet.</p>
+                     <p className="text-sm">Try adjusting your filters or search again.</p>
+                  </div>
                )}
 
-               {/* ... Sidebar & Grid List SAMA ... */}
+               {/* === REAL-TIME RECS === */}
+               {realtimeRecs.length > 0 && (
+                 <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <h3 className="text-xl font-bold text-blue-900 mb-4 italic flex items-center gap-2">
+                       <span>✨</span> Based on your last like (Real-time AI):
+                    </h3>
+                    <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
+                       {realtimeRecs.map(shoe => (
+                         <div key={shoe.id || shoe.shoe_id} className="min-w-[180px] bg-white p-4 rounded-xl shadow-sm border border-blue-100 flex flex-col items-center text-center">
+                           <div className="h-24 w-full flex items-center justify-center mb-3">
+                              <img src={shoe.img_url || shoe.img} className="max-h-full object-contain" alt={shoe.name} />
+                           </div>
+                           <p className="text-[10px] font-bold text-gray-400 uppercase">{shoe.brand}</p>
+                           <h4 className="text-xs font-bold text-gray-800 line-clamp-2">{shoe.name}</h4>
+                         </div>
+                       ))}
+                    </div>
+                 </div>
+               )}
+
                <div className="flex flex-col md:flex-row gap-8">
                    <div className="w-full md:w-1/4">
                        <div className="bg-gray-100/50 rounded-2xl p-6 sticky top-4 max-h-[85vh] flex flex-col">
@@ -371,15 +443,15 @@ export default function Recommendation() {
                            filteredListShoes.map((shoe) => (
                                <div key={shoe.id || shoe.shoe_id} className="bg-white rounded-xl p-4 flex flex-col sm:flex-row items-center gap-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group">
                                    <div className="w-full sm:w-[180px] h-[120px] bg-blue-50 rounded-lg flex items-center justify-center p-2">
-                                       <img src={shoe.img || shoe.image_url} alt={shoe.name} className="max-w-full max-h-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform" />
+                                       <img src={shoe.img || shoe.img_url} alt={shoe.name} className="max-w-full max-h-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform" />
                                    </div>
                                    <div className="flex-1 w-full">
                                        <p className="text-xs font-bold text-gray-500 uppercase mb-1">{shoe.brand}</p>
                                        <h4 className="font-serif font-bold text-xl text-gray-900 mb-1">{shoe.name}</h4>
-                                       <p className="text-gray-600 text-sm mb-3">Weight : {shoe.weight}g</p>
+                                       <p className="text-gray-600 text-sm mb-3">Weight : {shoe.weight_lab_oz}oz</p>
                                        <div className="flex items-center gap-1">
                                            <svg className="w-4 h-4 text-gray-800 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
-                                           <span className="text-sm font-bold">{shoe.rating}</span>
+                                           <span className="text-sm font-bold">{shoe.rating ? shoe.rating.toFixed(1) : "0.0"}</span>
                                        </div>
                                    </div>
                                    <div className="flex flex-row sm:flex-col items-center justify-between w-full sm:w-auto gap-3 mt-2 sm:mt-0">
@@ -390,11 +462,17 @@ export default function Recommendation() {
                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" /></svg>
                                            )}
                                        </button>
-                                       <button className="bg-[#000080] text-white text-xs font-bold px-5 py-2.5 rounded-lg hover:bg-blue-900 transition-colors whitespace-nowrap">Learn More</button>
+                                       {/* --- PERBAIKAN LEARN MORE JUGA DISINI --- */}
+                                       <button 
+                                            onClick={() => navigate(`/shoes/${shoe.shoe_id || shoe.id}`)}
+                                            className="bg-[#000080] text-white text-xs font-bold px-5 py-2.5 rounded-lg hover:bg-blue-900 transition-colors whitespace-nowrap"
+                                       >
+                                            Learn More
+                                       </button>
                                    </div>
                                </div>
                            ))
-                       ) : (<div className="text-center py-20 text-gray-500">No shoes found for selected filters.</div>)}
+                       ) : (<div className="text-center py-20 text-gray-500 bg-white rounded-xl border border-gray-100">No shoes found for selected filters.</div>)}
                    </div>
                </div>
            </div>
@@ -409,7 +487,6 @@ export default function Recommendation() {
         <button onClick={() => setStep("menu")} className="absolute top-4 left-4 text-[10px] font-bold text-gray-400 hover:text-orange-500">← BACK</button>
         <h1 className="text-center font-serif font-bold text-lg mb-1 mt-4 uppercase tracking-wider">{step === "road" ? "User Input Road" : "User Input Trail"}</h1>
         
-        {/* 4. TAMPILKAN BANNER PINK DISINI JUGA (JIKA USER LOLOS MENU TP ERROR DI TENGAH JALAN) */}
         {error && (
             <div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2">
                 <span>{error}</span>
@@ -429,7 +506,7 @@ export default function Recommendation() {
           <label className="block text-xs font-bold mb-3 uppercase text-gray-700">Foot Width Type <span className="text-red-500">*</span></label>
           <div className="grid grid-cols-3 gap-3">
             {widthOptions.map((opt) => (
-              <button key={opt.label} onClick={() => handleToggleSelect('footWidth', opt.label)} className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center transition-all ${commonData.footWidth === opt.label ? activeStyle : inactiveStyle}`}>
+              <button key={opt.label} onClick={() => handleToggleSelect('footWidth', opt.value)} className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center transition-all ${commonData.footWidth === opt.value ? activeStyle : inactiveStyle}`}>
                 <img src={opt.img} alt={opt.label} className="h-10 w-auto mb-2" />
                 <span className="text-[10px] font-bold">{opt.label}</span>
               </button>
@@ -442,7 +519,7 @@ export default function Recommendation() {
           <label className="block text-xs font-bold mb-3 uppercase text-gray-700">Arch Type <span className="text-red-500">*</span></label>
           <div className="grid grid-cols-3 gap-3">
             {archOptions.map((opt) => (
-              <button key={opt.label} onClick={() => handleToggleSelect('archType', opt.label)} className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center transition-all ${commonData.archType === opt.label ? activeStyle : inactiveStyle}`}>
+              <button key={opt.label} onClick={() => handleToggleSelect('archType', opt.value)} className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center transition-all ${commonData.archType === opt.value ? activeStyle : inactiveStyle}`}>
                 <img src={opt.img} alt={opt.label} className="h-8 w-auto mb-2" />
                 <span className="text-[10px] font-bold leading-tight">{opt.label}</span>
               </button>
