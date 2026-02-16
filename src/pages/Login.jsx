@@ -53,7 +53,7 @@ export default function Login() {
       } else {
         // Jika backend tidak kirim has_profile, asumsi langsung ke home atau create profile
         alert("Login Successful!");
-        navigate("/"); // Atau ganti ke "/create-profile" jika logika backend mendukung
+        navigate("/user-profile"); // Atau ganti ke "/create-profile" jika logika backend mendukung
       }
 
     } catch (err) {
