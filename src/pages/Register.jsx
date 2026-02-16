@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-// ✅ GANTI IMPORT: Pakai api instance buatanmu biar connect ke Railway
+// Pastikan path ini sesuai dengan lokasi file axios.js kamu
 import api from "../api/axios"; 
 import TermsModal from "../components/TermsModal";
 
@@ -58,13 +58,14 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      // ✅ UPDATE: Pakai api.post & Path Relatif (Railway otomatis terdeteksi)
+      // Endpoint sesuai urls.py: 'register/'
       await api.post("/api/register/", {
         username: formData.username,
         email: formData.email,
         password: formData.password
       });
 
+      // Jika sukses, lanjut ke step OTP
       setStep("verify"); 
       setResendTimer(60); 
       alert("The OTP has been sent to your email.");
@@ -72,9 +73,12 @@ export default function Register() {
     } catch (err) {
       console.error("Register Error:", err);
       const data = err.response?.data;
-      if (data?.email) setError(data.email[0]);
+      // Handle error dari Django (biasanya return object field error)
+      if (data?.username) setError(data.username[0]);
+      else if (data?.email) setError(data.email[0]);
+      else if (data?.password) setError(data.password[0]);
       else if (data?.error) setError(data.error);
-      else setError("Registration failed. Backend unreachable?");
+      else setError("Registration failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -82,9 +86,9 @@ export default function Register() {
 
   // --- FUNGSI KIRIM ULANG OTP ---
   const handleResendCode = async () => {
-    setResendTimer(60); // Reset waktu jadi 60 detik lagi
+    setResendTimer(60); 
     try {
-      // ✅ UPDATE: Pakai api.post
+      // Endpoint sesuai urls.py: 'resend-otp/'
       await api.post("/api/resend-otp/", {
         email: formData.email
       });
@@ -103,7 +107,8 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      // ✅ UPDATE: Pakai api.post
+      // Endpoint sesuai urls.py: 'verify-otp/'
+      // Kirim semua data yang diperlukan backend untuk create user final
       await api.post("/api/verify-otp/", {
         username: formData.username,
         email: formData.email,
@@ -130,8 +135,6 @@ export default function Register() {
     <div className="min-h-screen flex items-start justify-center bg-[#f5f5f7] px-4 pt-20 pb-20">
       <div className="w-full max-w-md bg-white p-6 md:p-8 rounded-2xl shadow-xl border border-slate-100">
         
-        {/* ... sisa code lainnya ... */} 
-
         {/* === TAMPILAN 1: FORM REGISTER === */}
         {step === "register" && (
           <>
@@ -173,7 +176,7 @@ export default function Register() {
                 <input type="password" id="confirmPassword" value={formData.confirmPassword} onChange={handleChange} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 bg-slate-50" required />
               </div>
 
-              {/* --- CHECKBOX FIX --- */}
+              {/* CHECKBOX TERMS */}
               <div className="flex items-center gap-2 mt-3">
                 <input 
                   type="checkbox" 
@@ -190,7 +193,7 @@ export default function Register() {
 
               {error && <p className="text-red-500 text-xs font-medium">{error}</p>}
 
-              <button type="submit" disabled={isLoading} className="mt-2 w-full text-white font-bold py-3.5 rounded-lg bg-[#0a0a5c] hover:bg-blue-900 transition-all cursor-pointer">
+              <button type="submit" disabled={isLoading} className="mt-2 w-full text-white font-bold py-3.5 rounded-lg bg-[#0a0a5c] hover:bg-blue-900 transition-all cursor-pointer disabled:bg-slate-400">
                 {isLoading ? "Processing..." : "Sign Up"}
               </button>
             </form>
@@ -217,7 +220,7 @@ export default function Register() {
             
             {error && <p className="text-red-500 text-sm mb-3 text-center">{error}</p>}
 
-            <button onClick={handleVerifyOtp} disabled={isLoading} className="w-full text-white font-bold py-3.5 rounded-lg bg-[#0a0a5c] hover:bg-blue-900 transition-all cursor-pointer">
+            <button onClick={handleVerifyOtp} disabled={isLoading} className="w-full text-white font-bold py-3.5 rounded-lg bg-[#0a0a5c] hover:bg-blue-900 transition-all cursor-pointer disabled:bg-slate-400">
               {isLoading ? "Verifying..." : "Confirm Code"}
             </button>
             
