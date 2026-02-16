@@ -39,9 +39,7 @@ useEffect(() => {
   // 3. LOGIC GAMBAR PROFILE (Dinamis)
   // Kalau username ada (misal: "Sonic"), pakai API ui-avatars buat bikin gambar huruf "S"
   // Kalau username kosong, pakai gambar dummy
-  const userImage = username 
-    ? `https://ui-avatars.com/api/?name=${username}&background=0D8ABC&color=fff&bold=true`
-    : "https://i.pravatar.cc/150?img=11"; 
+  const userImage = `https://ui-avatars.com/api/?name=${username}&background=0D8ABC&color=fff&bold=true`; 
 
   const handleSearch = (e) => {
     if (e.key === 'Enter' && searchQuery.trim() !== "") {
