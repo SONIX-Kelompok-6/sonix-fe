@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom'; // 1. Tambah useLocation
-import axios from 'axios';
+import api from "../api/axios"; 
 
 export default function Compare() {
   const [allShoesDb, setAllShoesDb] = useState([]); 
@@ -267,12 +267,12 @@ export default function Compare() {
 
       try {
         // A. Ambil Semua Sepatu
-        const shoesResponse = await axios.get('http://127.0.0.1:8000/api/shoes/', {
+        const shoesResponse = await api.get("/api/shoes/", {
           headers: { 'Authorization': `Token ${token}` }
         });
         
         // B. Ambil List Favorit User (Untuk sorting di modal)
-        const favResponse = await axios.get('http://127.0.0.1:8000/api/favorites/', {
+        const favResponse = await api.get('/api/favorites/', {
           headers: { 'Authorization': `Token ${token}` }
         });
 
@@ -532,7 +532,6 @@ export default function Compare() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

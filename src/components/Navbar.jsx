@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"; 
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../api/axios"; 
 import logoImg from '../assets/logo-dark.svg'; 
 
 export default function Navbar() {
@@ -16,27 +16,25 @@ export default function Navbar() {
   const [username, setUsername] = useState("");
 
   // 2. USE EFFECT BARU: Fetch data user saat Navbar dimuat
-  useEffect(() => {
-    const fetchUserData = async () => {
-      const token = localStorage.getItem("userToken");
-      
-      // Cuma jalanin kalau user emang lagi login (punya token)
-      if (token) {
-        try {
-          // Panggil API yang sama dengan halaman Account
-          const response = await axios.get('http://localhost:8000/api/user-profile/', {
-            headers: { 'Authorization': `Token ${token}` }
-          });
-          // Simpan username dari respon backend
-          setUsername(response.data.username);
-        } catch (error) {
-          console.error("Gagal ambil data user di Navbar:", error);
-        }
+useEffect(() => {
+  const fetchUserData = async () => {
+    const token = localStorage.getItem("userToken");
+    
+    if (token) {
+      try {
+        // GANTI INI: Pakai endpoint profile, JANGAN pakai /api/login/
+        const response = await api.get("/api/user-profile/"); 
+        
+        // Ambil username dari data profile
+        setUsername(response.data.username);
+      } catch (error) {
+        console.error("Gagal ambil data user di Navbar:", error);
       }
-    };
+    }
+  };
 
-    fetchUserData();
-  }, [isAuthenticated]); // Jalankan ulang kalau status login berubah
+  fetchUserData();
+}, [isAuthenticated]);
 
   // 3. LOGIC GAMBAR PROFILE (Dinamis)
   // Kalau username ada (misal: "Sonic"), pakai API ui-avatars buat bikin gambar huruf "S"
@@ -54,7 +52,7 @@ export default function Navbar() {
     const token = localStorage.getItem("userToken");
     try {
       if (token) {
-        await axios.post('http://localhost:8000/api/logout/', {}, {
+        await api.post("/api/logout/", {}, {
           headers: { 'Authorization': `Token ${token}` }
         });
       }
