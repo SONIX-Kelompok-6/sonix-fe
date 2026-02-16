@@ -267,7 +267,7 @@ export default function Compare() {
 
       try {
         // A. Ambil Semua Sepatu
-        const shoesResponse = await api.post("/api/shoes/", {
+        const shoesResponse = await api.get("/api/shoes/", {
           headers: { 'Authorization': `Token ${token}` }
         });
         
