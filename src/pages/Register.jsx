@@ -8,10 +8,14 @@ export default function Register() {
   const navigate = useNavigate();
 
   // STATE
-  const [formData, setFormData] = useState({ email: "", password: "", confirmPassword: "" });
+  const [formData, setFormData] = useState({ 
+    username: "", 
+    email: "", 
+    password: "", 
+    confirmPassword: "" 
+  });
   const [otpCode, setOtpCode] = useState("");
   const [step, setStep] = useState("register"); // 'register' atau 'verify'
-
   const [resendTimer, setResendTimer] = useState(60);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -56,14 +60,14 @@ export default function Register() {
     try {
       // ✅ UPDATE: Pakai api.post & Path Relatif (Railway otomatis terdeteksi)
       await api.post("/api/register/", {
+        username: formData.username,
         email: formData.email,
         password: formData.password
       });
 
-      // Sukses -> Pindah ke Form OTP
       setStep("verify"); 
-      setResendTimer(60); // Reset timer saat masuk halaman OTP
-      alert("Kode OTP telah dikirim ke email kamu!");
+      setResendTimer(60); 
+      alert("The OTP has been sent to your email.");
 
     } catch (err) {
       console.error("Register Error:", err);
@@ -84,16 +88,16 @@ export default function Register() {
       await api.post("/api/resend-otp/", {
         email: formData.email
       });
-      alert("Kode OTP baru telah dikirim!");
+      alert("A new OTP code has been sent.");
     } catch (err) {
       console.error("Resend Error:", err);
-      alert("Gagal mengirim ulang kode. Coba lagi nanti.");
+      alert("Unable to resend code. Please try again later.");
     }
   };
 
   // --- 2. PROSES VERIFIKASI OTP ---
   const handleVerifyOtp = async () => {
-    if (otpCode.length < 6) { setError("Masukkan kode 6 digit."); return; }
+    if (otpCode.length < 6) { setError("Please enter the full 6 digit code."); return; }
     
     setError("");
     setIsLoading(true);
@@ -101,9 +105,10 @@ export default function Register() {
     try {
       // ✅ UPDATE: Pakai api.post
       await api.post("/api/verify-otp/", {
+        username: formData.username,
         email: formData.email,
         otp: otpCode,
-        password: formData.password // Kirim pass lagi untuk disimpan ke DB
+        password: formData.password 
       });
 
       alert("Account created successfully! Please Login.");
@@ -122,9 +127,11 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-start justify-center bg-[#f5f5f7] px-4 pt-20">
+    <div className="min-h-screen flex items-start justify-center bg-[#f5f5f7] px-4 pt-20 pb-20">
       <div className="w-full max-w-md bg-white p-6 md:p-8 rounded-2xl shadow-xl border border-slate-100">
         
+        {/* ... sisa code lainnya ... */} 
+
         {/* === TAMPILAN 1: FORM REGISTER === */}
         {step === "register" && (
           <>
@@ -134,6 +141,20 @@ export default function Register() {
             </div>
 
             <form className="flex flex-col gap-3" onSubmit={handleRegister}>
+              {/* Input Username */}
+              <div>
+                <label className="block text-slate-700 font-bold mb-1 text-sm">Username</label>
+                <input 
+                  type="text" 
+                  id="username" 
+                  value={formData.username} 
+                  onChange={handleChange} 
+                  placeholder="runner123" 
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-300 bg-slate-50" 
+                  required 
+                />
+              </div>
+
               {/* Input Email */}
               <div>
                 <label className="block text-slate-700 font-bold mb-1 text-sm">Email Address</label>
