@@ -1,28 +1,59 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react"; 
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import logoImg from '../assets/logo-dark.svg'; 
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const navigate = useNavigate();
-
-  // 1. TAMBAHAN SEARCH: State untuk nyimpen ketikan user
+  const dropdownRef = useRef(null);
+  
   const [searchQuery, setSearchQuery] = useState("");
-
   const isAuthenticated = !!localStorage.getItem("userToken");
 
-  // 2. TAMBAHAN SEARCH: Fungsi buat nangkep tombol Enter
+  // 1. STATE BARU: Untuk menyimpan username yang sedang login
+  const [username, setUsername] = useState("");
+
+  // 2. USE EFFECT BARU: Fetch data user saat Navbar dimuat
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const token = localStorage.getItem("userToken");
+      
+      // Cuma jalanin kalau user emang lagi login (punya token)
+      if (token) {
+        try {
+          // Panggil API yang sama dengan halaman Account
+          const response = await axios.get('http://localhost:8000/api/user-profile/', {
+            headers: { 'Authorization': `Token ${token}` }
+          });
+          // Simpan username dari respon backend
+          setUsername(response.data.username);
+        } catch (error) {
+          console.error("Gagal ambil data user di Navbar:", error);
+        }
+      }
+    };
+
+    fetchUserData();
+  }, [isAuthenticated]); // Jalankan ulang kalau status login berubah
+
+  // 3. LOGIC GAMBAR PROFILE (Dinamis)
+  // Kalau username ada (misal: "Sonic"), pakai API ui-avatars buat bikin gambar huruf "S"
+  // Kalau username kosong, pakai gambar dummy
+  const userImage = username 
+    ? `https://ui-avatars.com/api/?name=${username}&background=0D8ABC&color=fff&bold=true`
+    : "https://i.pravatar.cc/150?img=11"; 
+
   const handleSearch = (e) => {
     if (e.key === 'Enter' && searchQuery.trim() !== "") {
       navigate(`/search?q=${searchQuery}`);
-      setSearchQuery(""); // (Opsional) Kosongin bar pencarian setelah di-enter
+      setSearchQuery(""); 
     }
   };
 
   const handleLogout = async () => {
     const token = localStorage.getItem("userToken");
-
     try {
       if (token) {
         await axios.post('http://localhost:8000/api/logout/', {}, {
@@ -38,6 +69,18 @@ export default function Navbar() {
     }
   };
 
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsProfileOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [dropdownRef]);
+
   const menuItems = [
     { name: "Home", path: "/" },
     { name: "Recommendation", path: "/recommendation" },
@@ -48,7 +91,7 @@ export default function Navbar() {
 
   return (
     <div className="fixed top-6 left-0 right-0 z-50 flex justify-center px-4">
-      <nav className="relative flex w-full max-w-6xl items-center justify-between rounded-full bg-blue-50/90 px-6 py-3 shadow-lg backdrop-blur-md border border-white/40">
+      <nav className="absolute top-0 w-full max-w-6xl z-50 flex items-center justify-between rounded-full bg-blue-50/90 px-6 py-3 shadow-lg backdrop-blur-md border border-white/40">
         
         {/* LOGO */}
         <Link to="/" className="flex items-center gap-3 group">
@@ -87,22 +130,60 @@ export default function Navbar() {
             <input
               type="text"
               placeholder="Search..."
-              // 3. TAMBAHAN SEARCH: Sambungin input ke state dan fungsi handleSearch
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleSearch}
-              className="w-80 rounded-full bg-gray-200/50 py-2 pl-9 pr-4 text-sm font-medium text-gray-700 placeholder-gray-400 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="w-64 xl:w-80 rounded-full bg-gray-200/50 py-2 pl-9 pr-4 text-sm font-medium text-gray-700 placeholder-gray-400 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
 
-          {/* DYNAMIC BUTTON (LOGIC LOGOUT/LOGIN) */}
+          {/* DYNAMIC BUTTON (PROFILE / LOGIN) */}
           {isAuthenticated ? (
-            <button 
-              onClick={handleLogout}
-              className="hidden sm:flex items-center justify-center h-10 rounded-full bg-red-600 px-8 text-sm font-bold text-white shadow-md transition hover:bg-red-700 hover:shadow-lg active:scale-95"
-            >
-              Logout
-            </button>
+            <div className="relative hidden sm:block" ref={dropdownRef}>
+              {/* Avatar Button */}
+              <button 
+                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                className="cursor-pointer flex items-center justify-center w-10 h-10 rounded-full border-2 border-blue-600 overflow-hidden transition hover:shadow-md focus:outline-none"
+              >
+                <img 
+                  src={userImage} 
+                  alt="User Profile" 
+                  className="w-full h-full object-cover"
+                />
+              </button>
+
+              {/* Dropdown Menu */}
+              {isProfileOpen && (
+                <div className="absolute right-0 mt-3 w-48 origin-top-right bg-[#1e2a4a] rounded-xl shadow-xl border border-blue-800/50 text-white animate-in fade-in slide-in-from-top-2">
+                  <div className="absolute -top-1 right-3 w-3 h-3 bg-[#1e2a4a] rotate-45 border-l border-t border-blue-800/50"></div>
+                  
+                  <div className="flex flex-col py-2">
+                    
+                    {/* 4. TAMBAHAN: Nama User di Dropdown */}
+                    <div className="px-4 py-2 text-xs text-gray-400 border-b border-gray-600 mb-1">
+                      Hi, {username || "Runner"}
+                    </div>
+
+                    <Link 
+                      to="/account" 
+                      className="px-4 py-2 text-sm font-medium hover:bg-blue-800 transition text-center"
+                      onClick={() => setIsProfileOpen(false)}
+                    >
+                      Account
+                    </Link>
+                    
+                    <div className="h-px bg-gray-600/50 mx-4 my-1"></div>
+                    
+                    <button 
+                      onClick={handleLogout}
+                      className="px-4 py-2 text-sm font-medium hover:bg-blue-800 transition text-center text-red-300 hover:text-red-200"
+                    >
+                      Log Out
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <Link 
               to="/login"
@@ -112,7 +193,7 @@ export default function Navbar() {
             </Link>
           )}
 
-          {/* HAMBURGER BUTTON */}
+          {/* HAMBURGER BUTTON (Mobile) */}
           <button 
             className="md:hidden p-2 text-gray-600 transition hover:text-blue-600"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -145,15 +226,24 @@ export default function Navbar() {
               <hr className="border-gray-200" />
               
               {isAuthenticated ? (
-                <button 
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    handleLogout();
-                  }}
-                  className="flex w-full items-center justify-center rounded-full bg-red-600 py-2 text-sm font-bold text-white hover:bg-red-700"
-                >
-                  Logout
-                </button>
+                <>
+                  <Link 
+                    to="/account"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex w-full items-center justify-center rounded-full bg-gray-100 py-2 text-sm font-bold text-gray-700 hover:bg-gray-200 mb-2"
+                  >
+                    Account ({username})
+                  </Link>
+                  <button 
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="flex w-full items-center justify-center rounded-full bg-red-600 py-2 text-sm font-bold text-white hover:bg-red-700"
+                  >
+                    Logout
+                  </button>
+                </>
               ) : (
                 <Link 
                   to="/login"
