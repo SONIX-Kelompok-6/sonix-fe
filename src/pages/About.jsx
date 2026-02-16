@@ -1,6 +1,6 @@
 import React from "react";
 import tornPaper from "../assets/about-page/torn-paper.png";
-import rushLogo from "../assets/logo-dark.svg";
+import rushLogo from "../assets/about-page/logo-dark.png";
 
 
 export default function About() {
