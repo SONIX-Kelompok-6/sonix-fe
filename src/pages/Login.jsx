@@ -45,6 +45,10 @@ export default function Login() {
           localStorage.setItem("userEmail", response.data.email);
       }
 
+      if (response.data.user_id) {
+          localStorage.setItem("userId", response.data.user_id);
+      }
+
       // Logic Redirect
       // Cek apakah backend mengirim field 'has_profile'
       if (response.data.has_profile) {
