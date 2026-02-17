@@ -334,25 +334,79 @@ export default function Recommendation() {
     </div>
   );
 
-  // --- RENDER MENU ---
+  // --- RENDER MENU (UPDATED DESIGN) ---
   if (step === "menu") {
     return (
-      <div className="bg-white rounded-3xl shadow-xl w-[90%] max-w-[400px] p-8 mx-auto my-10 border border-gray-100 flex flex-col items-center">
+      // Perubahan: max-w-[400px] diubah menjadi max-w-4xl agar muat horizontal
+      <div className="bg-white rounded-3xl shadow-xl w-[90%] max-w-4xl p-8 mx-auto my-10 border border-gray-100 flex flex-col items-center transition-all duration-500">
+        
         {error && (
-            <div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2">
-                <span>{error}</span>
-            </div>
+          <div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2">
+            <span>{error}</span>
+          </div>
         )}
-        <h2 className="text-center font-bold tracking-[0.1em] mb-5 text-gray-800 text-xl">TYPES OF RUNNING</h2>
-        <div className="flex flex-col gap-6 w-full">
-          <div onClick={() => {if(!error) {setStep("road"); setShowMore(false);} }} className={`relative rounded-2xl overflow-hidden group shadow-md transition-all ${error ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-xl'}`}>
-             <img src={roadImg} alt="Road" className={`w-full h-[165px] object-cover transition-transform duration-700 ${!error && 'group-hover:scale-110'}`} />
-             <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-all"><span className="text-white text-3xl font-extrabold drop-shadow-2xl [-webkit-text-stroke:1px_orange] uppercase tracking-wider">Road Running</span></div>
+
+        <h2 className="text-center font-bold tracking-[0.1em] mb-8 text-gray-800 text-xl uppercase">
+          Types of Running
+        </h2>
+
+        {/* Container Horizontal untuk Desktop, Vertical untuk Mobile */}
+        <div className="flex flex-col md:flex-row gap-6 w-full px-2">
+          
+          {/* --- ROAD RUNNING CARD --- */}
+          <div 
+            onClick={() => { if(!error) { setStep("road"); setShowMore(false); } }} 
+            className={`relative flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-64 
+              ${error ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`
+            }
+          >
+            {/* Background Image */}
+            <img 
+              src={roadImg} 
+              alt="Road" 
+              className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out 
+                ${!error && 'group-hover:scale-110'}`
+              } 
+            />
+            
+            {/* Dark Overlay */}
+            <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors duration-300"></div>
+
+            {/* Text Overlay */}
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              <span className="text-white text-4xl md:text-5xl font-bold tracking-[0.25em] uppercase drop-shadow-lg text-center px-4">
+                ROAD
+              </span>
+            </div>
           </div>
-          <div onClick={() => {if(!error) {setStep("trail"); setShowMore(false);} }} className={`relative rounded-2xl overflow-hidden group shadow-md transition-all ${error ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-xl'}`}>
-             <img src={trailImg} alt="Trail" className={`w-full h-[165px] object-cover transition-transform duration-700 ${!error && 'group-hover:scale-110'}`} />
-             <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-all"><span className="text-white text-3xl font-extrabold drop-shadow-2xl [-webkit-text-stroke:1px_orange] uppercase tracking-wider">Trail Running</span></div>
+
+          {/* --- TRAIL RUNNING CARD --- */}
+          <div 
+            onClick={() => { if(!error) { setStep("trail"); setShowMore(false); } }} 
+            className={`relative flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-64 
+              ${error ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`
+            }
+          >
+            {/* Background Image */}
+            <img 
+              src={trailImg} 
+              alt="Trail" 
+              className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out 
+                ${!error && 'group-hover:scale-110'}`
+              } 
+            />
+
+            {/* Dark Overlay */}
+            <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors duration-300"></div>
+
+            {/* Text Overlay */}
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              <span className="text-white text-4xl md:text-5xl font-bold tracking-[0.25em] uppercase drop-shadow-lg text-center px-4">
+                TRAIL
+              </span>
+            </div>
           </div>
+
         </div>
       </div>
     );
