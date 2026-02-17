@@ -196,12 +196,11 @@ const handleToggleFavorite = async () => {
     // 1. Ambil list yang sudah ada di memori browser
     let compareList = JSON.parse(localStorage.getItem("compareList")) || [];
 
-    // 2. Cek apakah sepatu ini SUDAH ADA? (Cegah Duplikat)
-    // Kita pakai shoeData.shoe_id (pastikan backend kirim ini)
+    // 2. Cek apakah sepatu ini SUDAH ADA?
     const isExists = compareList.some((item) => item.shoe_id === shoeData.shoe_id);
     if (isExists) {
       alert(`"${shoeData.model}" has already been added to the comparison list!`);
-      return;
+      return; // Stop di sini kalau duplikat
     }
 
     // 3. Cek Limit Maksimal 5
@@ -210,16 +209,20 @@ const handleToggleFavorite = async () => {
       return;
     }
 
-    // 4. Siapkan Data yang Mau Disimpan (Sesuaikan dengan struktur yang dipakai di Search.jsx)
-    // Pastikan field-field penting terbawa (shoe_id, name/model, brand, image_url, slug)
+    // 4. Siapkan Data (FIXED VERSION)
     const shoeToSave = {
-        ...shoeData,
+        ...shoeData, // Copy semua data detail (Weight, Drop, dll harusnya ikut kebawa di sini)
+        
         shoe_id: shoeData.shoe_id,
-        name: shoeData.model, // Di detail namanya 'model', tapi di search biasanya 'name', sesuaikan
+        name: shoeData.model, // Standarisasi nama
         brand: shoeData.brand,
-        slug: shoeData.slug,
-        img_url: shoeData.image_url || shoeData.img_url || shoeData.mainImage, // Sesuaikan key image biar seragam
-        // ... field lain yang dirasa perlu buat preview di tabel compare
+        
+        // PERBAIKAN UTAMA DI SINI 
+        // Prioritas 1: Ambil dari URL (pasti ada & benar)
+        // Prioritas 2: Ambil dari data backend (kalau ada)
+        slug: slug || shoeData.slug, 
+        
+        img_url: shoeData.image_url || shoeData.img_url || shoeData.mainImage,
     };
 
     // 5. Masukkan ke List
@@ -229,7 +232,7 @@ const handleToggleFavorite = async () => {
     localStorage.setItem("compareList", JSON.stringify(compareList));
 
     // 7. Feedback
-    alert(`Successfully added "${shoeData.model}" to comparison list!`);
+    alert(`Successfully added "${shoeToSave.name}" to comparison list!`);
   };
 
   if (isLoading) return <div className="flex h-screen items-center justify-center text-white bg-[#4a76a8]">Loading...</div>;
