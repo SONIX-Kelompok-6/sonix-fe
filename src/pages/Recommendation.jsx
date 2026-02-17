@@ -198,14 +198,12 @@ export default function Recommendation() {
     const idString = String(shoeId);
     const isCurrentlyFavorite = favoriteIds.includes(idString);
 
-    // --- LOGIC BARU ---
-    // Tentukan Value: 
-    // Kalau sekarang Favorite (True) -> Berarti user mau UNLIKE -> Kirim 0
-    // Kalau sekarang Belum (False) -> Berarti user mau LIKE -> Kirim 1
+    // Logic Value: 
+    // If currently favorite (True) -> User wants to UNLIKE -> Send 0
+    // If currently not favorite (False) -> User wants to LIKE -> Send 1
     const interactionValue = isCurrentlyFavorite ? 0 : 1; 
-    // ------------------
 
-    // Optimistic Update
+    // Optimistic Update (UI)
     setFavoriteIds((prevIds) => 
         isCurrentlyFavorite 
         ? prevIds.filter(id => id !== idString) 
@@ -213,30 +211,40 @@ export default function Recommendation() {
     );
 
     try {
-      // 1. Tembak API Backend
+      // 1. Call Backend API (Database) - CRITICAL
+      // This must succeed. If it fails, it goes to the main 'catch' block.
       await api.post(
           "/api/favorites/toggle/", 
           { shoe_id: idString }, 
           { headers: { Authorization: `Token ${token}` } }
       );
       
-      // 2. Tembak API ML (Interact)
+      // 2. --- CALL ML API (INTERACT) - BEST EFFORT ---
+      // We wrap this in its own try-catch so it doesn't break the flow if it fails
       if (userId) {
-        // HAPUS if (!isCurrentlyFavorite), karena Unlike pun harus lapor
-        console.log(`[ML] Sending interaction. Value: ${interactionValue}`);
-        
-        // Tambahkan parameter ke-4: interactionValue
-        const feedbackRecs = await sendInteraction(userId, idString, 'like', interactionValue);
-        
-        // Update rekomendasi realtime (biasanya muncul pas Like aja, tapi terserah logic UI mu)
-        if (feedbackRecs && feedbackRecs.length > 0) {
-            setRealtimeRecs(feedbackRecs);
+        try {
+            console.log(`[ML] Sending interaction... Value: ${interactionValue}`);
+            
+            // Send interaction to ML
+            const feedbackRecs = await sendInteraction(userId, idString, 'like', interactionValue);
+            
+            // Update realtime recommendations (Only if ML succeeds)
+            if (feedbackRecs && feedbackRecs.length > 0) {
+                setRealtimeRecs(feedbackRecs);
+            }
+            console.log("[ML] Success!");
+
+        } catch (mlErr) {
+            // IF ML FAILS: Log warning only. DO NOT ROLLBACK UI.
+            console.warn("[ML] Failed to send interaction, but Database is safe.", mlErr);
         }
       }
 
     } catch (err) {
-      console.error("Failed to toggle favorite:", err);
-      // Rollback
+      // This Catch block ONLY runs if the DATABASE (Step 1) fails.
+      console.error("Failed to toggle favorite (DB Error):", err);
+      
+      // Rollback UI (Undo the heart change)
       setFavoriteIds((prevIds) => 
           isCurrentlyFavorite 
           ? [...prevIds, idString] 

@@ -12,23 +12,19 @@ export default function Search() {
   const [error, setError] = useState(null);
 
   // LOGIC LENGKAP DENGAN INTEGRASI ML
-  const handleAddFavorite = async (shoe) => {
+ const handleAddFavorite = async (shoe) => {
     const token = localStorage.getItem("userToken");
-    const userId = localStorage.getItem("userId"); // <--- BARU: Ambil User ID untuk ML
+    const userId = localStorage.getItem("userId"); 
 
     if (!token) {
       setError("Please login first to save this shoe to your favorites.");
       return;
     }
 
-    // --- LOGIC BARU UNTUK ML ---
-    // Tentukan value: 
-    // Jika sepatu sedang "isFavorite" (True), berarti user mau UNLIKE -> kirim 0
-    // Jika sepatu belum "isFavorite" (False), berarti user mau LIKE -> kirim 1
+    // Logic Value (1 = Like, 0 = Unlike)
     const interactionValue = shoe.isFavorite ? 0 : 1;
-    // ---------------------------
 
-    // 1. Optimistic Update (Ubah UI duluan biar cepet)
+    // 1. Optimistic Update (Update UI first)
     setShoes((prevShoes) =>
       prevShoes.map((s) =>
         s.shoe_id === shoe.shoe_id ? { ...s, isFavorite: !s.isFavorite } : s
@@ -36,30 +32,35 @@ export default function Search() {
     );
 
     try {
-      // 2. Tembak API Backend (Simpan ke Database Django/Supabase)
+      // 2. Call Backend API (Database) - MUST SUCCEED
       await api.post(
         "/api/favorites/toggle/",
         { shoe_id: String(shoe.shoe_id) }, 
         {
-          headers: {
-            Authorization: `Token ${token}`,
-          },
+          headers: { Authorization: `Token ${token}` },
         }
       );
 
-      // 3. --- TEMBAK API ML (INTERACT) ---
-      // Ini yang bikin feed "You Might Also Like" bekerja
+      // 3. --- CALL ML API (INTERACT) ---
+      // Wrapped in its own try-catch so it doesn't affect the main flow
       if (userId) {
-          console.log(`[ML] Sending interaction: ${shoe.name}, Value: ${interactionValue}`);
-          // Parameter: userId, shoeId, actionType ('like'), value (1 atau 0)
-          await sendInteraction(userId, shoe.shoe_id, 'like', interactionValue);
+          try {
+             console.log(`[ML] Sending interaction...`);
+             await sendInteraction(userId, shoe.shoe_id, 'like', interactionValue);
+             console.log("[ML] Success!");
+          } catch (mlErr) {
+              // IF ML FAILS: Just log a warning.
+              // DO NOT throw error, so the function continues as success.
+              console.warn("[ML] Failed to send interaction, but Database is safe.", mlErr);
+          }
       }
       // -----------------------------------
 
     } catch (err) {
-      console.error("Failed to toggle favorite:", err);
+      // This Catch block ONLY runs if the DATABASE (Step 2) fails.
+      console.error("Failed to toggle favorite (DB Error):", err);
       
-      // Kalau gagal, balikin lagi statusnya (Rollback)
+      // Rollback UI (Revert heart color)
       setShoes((prevShoes) =>
         prevShoes.map((s) =>
           s.shoe_id === shoe.shoe_id ? { ...s, isFavorite: !s.isFavorite } : s

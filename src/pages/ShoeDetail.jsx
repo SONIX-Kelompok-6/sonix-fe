@@ -16,6 +16,7 @@ export default function ShoeDetail() {
   // 1. Cek Token & Email
   const token = localStorage.getItem("userToken");
   const currentUserEmail = localStorage.getItem("userEmail");
+  const storedUserName = localStorage.getItem("userName");
 
   // 2. State untuk menyimpan nama random (dibuat sekali saat komponen mount)
   const [randomGuestName] = useState(() => {
@@ -24,10 +25,21 @@ export default function ShoeDetail() {
   });
 
   // 3. Tentukan nama yang dipakai: Kalau login pakai email, kalau tidak pakai randomGuestName
-  const currentUserName = (token && currentUserEmail) 
-    ? currentUserEmail.split('@')[0] 
-    : randomGuestName;
-  // --- END UPDATE ---
+const currentUserName = (() => {
+    if (!token) return randomGuestName; // Kalau tidak login -> Random Guest
+
+    if (storedUserName) return storedUserName; // Kalau ada username -> Pakai Username
+    
+    if (currentUserEmail) {
+        // Kalau cuma ada email -> Ambil nama depan sebelum '@'
+        // Contoh: "shane@gmail.com" -> "shane"
+        const nameFromEmail = currentUserEmail.split('@')[0];
+        // Opsional: Bikin huruf pertama kapital biar rapi
+        return nameFromEmail.charAt(0).toUpperCase() + nameFromEmail.slice(1);
+    }
+
+    return "User"; 
+  })();
 
   useEffect(() => {
     const fetchShoeDetail = async () => {
@@ -121,11 +133,10 @@ export default function ShoeDetail() {
 
 
 
-// ...
 
 const handleToggleFavorite = async () => {
     const token = localStorage.getItem("userToken");
-    const userId = localStorage.getItem("userId"); // <--- BARU: Ambil User ID
+    const userId = localStorage.getItem("userId"); 
 
     if (!token) {
       alert("Please login first to save this shoe to your favorites.");
@@ -134,17 +145,16 @@ const handleToggleFavorite = async () => {
 
     const previousStatus = shoeData.isFavorite;
     
-    // --- LOGIC BARU UNTUK ML ---
-    // Kalau status sebelumnya True (Favorit), berarti user mau UNLIKE -> kirim 0
-    // Kalau status sebelumnya False (Belum Favorit), berarti user mau LIKE -> kirim 1
+    // Logic Value: 
+    // If previous was True (Favorite) -> User wants to UNLIKE -> Value 0
+    // If previous was False (Not Favorite) -> User wants to LIKE -> Value 1
     const interactionValue = previousStatus ? 0 : 1;
-    // ---------------------------
 
-    // Optimistic Update UI
+    // 1. Optimistic Update UI
     setShoeData({ ...shoeData, isFavorite: !previousStatus });
 
     try {
-      // 1. Tembak API Backend (Simpan ke DB)
+      // 2. Call Backend API (Database) - MUST SUCCEED
       const response = await api.post(
         "/api/favorites/toggle/",
         { shoe_id: shoeData.shoe_id },
@@ -153,21 +163,28 @@ const handleToggleFavorite = async () => {
         }
       );
       
-      // Update state sesuai balikan server (biar aman)
+      // Update state based on server response (for safety)
       setShoeData({ ...shoeData, isFavorite: response.data.is_favorite });
 
-      // 2. --- TEMBAK API ML (INTERACT) ---
-      // Supaya Home Feed langsung update
+      // 3. --- CALL ML API (INTERACT) ---
+      // Isolated Try-Catch so it doesn't break the main flow
       if (userId) {
-          console.log(`[ML] Sending interaction from Detail Page. Value: ${interactionValue}`);
-          // Parameter: userId, shoeId, actionType ('like'), value (1 atau 0)
-          await sendInteraction(userId, shoeData.shoe_id, 'like', interactionValue);
+          try {
+             console.log(`[ML] Sending interaction from Detail Page...`);
+             await sendInteraction(userId, shoeData.shoe_id, 'like', interactionValue);
+             console.log("[ML] Success!");
+          } catch (mlErr) {
+             // IF ML FAILS: Just log a warning. Do NOT rollback.
+             console.warn("[ML] Failed to interact, but Database saved successfully.", mlErr);
+          }
       }
       // -----------------------------------
 
     } catch (err) {
-      console.error("Failed to update favorite:", err);
-      // Rollback kalau error
+      // This Catch block ONLY runs if the DATABASE (Step 2) fails.
+      console.error("Failed to update favorite (DB Error):", err);
+      
+      // Rollback UI to previous state
       setShoeData({ ...shoeData, isFavorite: previousStatus });
       alert("Something went wrong. Please try again later.");
     }
@@ -254,7 +271,12 @@ const handleToggleFavorite = async () => {
                   </div>
                   <span className="text-2xl font-bold text-gray-700">{shoeData.rating || 0}</span>
                 </div>
-                <button className="bg-[#0a0a5c] text-white px-8 py-3 rounded-full font-bold hover:bg-blue-900 transition-colors">Compare</button>
+                <button 
+                  onClick={handleAddCompare} // <--- TAMBAHKAN INI
+                  className="bg-[#0a0a5c] text-white px-8 py-3 rounded-full font-bold hover:bg-blue-900 transition-colors"
+                >
+                  Compare
+                </button>
               </div>
             </div>
           </div>
