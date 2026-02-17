@@ -6,7 +6,6 @@ export default function Compare() {
   const [allShoesDb, setAllShoesDb] = useState([]); 
   
   // OPTIMASI 1: Instant Load State
-  // Langsung ambil dari LocalStorage saat inisialisasi biar gak blank/loading
   const [selectedShoes, setSelectedShoes] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("compareList")) || [];
@@ -18,7 +17,6 @@ export default function Compare() {
   const [favoriteIds, setFavoriteIds] = useState(new Set());
   
   // OPTIMASI 2: Matikan Loading Awal
-  // Default false karena kita sudah punya data di selectedShoes
   const [isLoading, setIsLoading] = useState(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -246,8 +244,6 @@ export default function Compare() {
   useEffect(() => {
     const fetchData = async () => {
       // OPTIMASI: Jangan setIsLoading(true) di sini biar gak muncul spinner
-      // Biarkan dia jalan di background (Silent Update)
-
       const token = localStorage.getItem("userToken");
 
       if (!token) {
@@ -257,7 +253,7 @@ export default function Compare() {
       }
 
       try {
-        // A. Ambil List Semua Sepatu (Buat Modal Add aja)
+        // A. Ambil List Semua Sepatu
         const shoesResponse = await api.get("/api/shoes/", {
           headers: { 'Authorization': `Token ${token}` }
         });
@@ -267,24 +263,19 @@ export default function Compare() {
           setAllShoesDb(shoesList);
         }
 
-        // --- LOGIC HYDRATION SAFE MODE (BACKGROUND) ---
+        // --- LOGIC HYDRATION SAFE MODE ---
         const savedList = JSON.parse(localStorage.getItem("compareList")) || [];
 
         if (savedList.length > 0) {
           const detailedPromises = savedList.map(async (simpleShoe) => {
             const identifier = simpleShoe.slug || simpleShoe.shoe_id;
-
             if (!identifier) return simpleShoe;
 
             try {
-              // Fetch detail terbaru (update harga/data kalau ada perubahan di server)
               const res = await api.get(`/api/shoes/${identifier}/`, {
                  headers: { 'Authorization': `Token ${token}` }
               });
-              
-              // Gabungkan data lama dan baru
               return { ...simpleShoe, ...res.data }; 
-              
             } catch (err) {
               console.warn(`Background fetch failed for: ${simpleShoe.name}`);
               return simpleShoe;
@@ -292,15 +283,11 @@ export default function Compare() {
           });
 
           const results = await Promise.all(detailedPromises);
-          
-          // Update State & LocalStorage dengan data terbaru dari server
           setSelectedShoes(results);
           localStorage.setItem("compareList", JSON.stringify(results));
-
         } else {
           setSelectedShoes([]);
         }
-        // --- END LOGIC  ---
 
         // B. Favorites
         const favResponse = await api.get('/api/favorites/', {
@@ -319,7 +306,6 @@ export default function Compare() {
             navigate('/login');
         }
       } 
-      // Finally block gak perlu karena kita gak mainan loading state di sini
     };
 
     fetchData();
@@ -328,7 +314,6 @@ export default function Compare() {
   // --- HANDLERS ---
   const handleAddShoe = (shoe) => {
     if (selectedShoes.length < 5) {
-      // Saat add manual, kita juga simpan
       const updatedList = [...selectedShoes, shoe];
       setSelectedShoes(updatedList);
       setIsModalOpen(false);
@@ -382,108 +367,135 @@ export default function Compare() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-32 pb-20 px-4 md:px-8 font-sans">
+    // UBAH 1: Container utama disamakan class-nya dengan Favorites.jsx
+    // Menggunakan max-w-6xl, mx-auto, padding yang konsisten, dan background default (putih)
+    <div className="max-w-6xl mx-auto px-6 pb-12 pt-8 min-h-screen font-sans">
       
       {/* HEADER */}
-      <div className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-end gap-4">
+      {/* UBAH 2: Header disesuaikan dengan Favorites (border-b, padding, margin) */}
+      <div className="mb-8 border-b pb-4 flex flex-col md:flex-row justify-between items-end gap-4">
         <div>
-          <h1 className="text-3xl md:text-4xl font-black text-[#0a0a5c] uppercase tracking-tight">Compare Shoes</h1>
-          <p className="text-gray-500 mt-2 text-sm md:text-base">Differences are highlighted in color.</p>
+          <h1 className="text-3xl font-bold text-gray-800">Compare Shoes</h1>
+          <p className="text-gray-500 text-sm mt-1">Differences are highlighted in color.</p>
         </div>
         <div className="text-sm font-bold text-orange-500 bg-orange-50 px-4 py-2 rounded-lg border border-orange-100">
           {selectedShoes.length} / 5 Slots Used
         </div>
       </div>
 
-      {/* --- TABLE CONTAINER --- */}
-      <div className="max-w-7xl mx-auto overflow-x-auto pb-6 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-        <div className="min-w-[900px]"> 
-          
-          {/* 1. HEADER ROW */}
-          <div className="grid gap-4 mb-6" style={{ gridTemplateColumns: `200px repeat(${Math.max(selectedShoes.length + 1, 2)}, 1fr)` }}>
-            <div className="flex flex-col justify-end pb-4 font-bold text-gray-400 text-xs uppercase tracking-widest">Models</div>
-
-            {selectedShoes.map((shoe, index) => (
-              <div key={shoe.shoe_id || index} className="relative bg-white rounded-2xl shadow-sm p-4 border border-gray-100 flex flex-col items-center text-center transition-all hover:shadow-md group">
-                <button 
-                  onClick={() => handleRemoveShoe(index)}
-                  className="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors z-10 p-1 hover:bg-red-50 rounded-full"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clipRule="evenodd" /></svg>
-                </button>
-
-                <div className="w-full h-32 flex items-center justify-center mb-4 relative">
-                  <div className="absolute inset-0 bg-gray-50 rounded-xl -z-10 scale-90 group-hover:scale-100 transition-transform"></div>
-                  {/* Gunakan img_url (dari search) atau mainImage (dari detail) */}
-                  <img src={shoe.img_url || shoe.mainImage || "https://placehold.co/100x100?text=No+Image"} alt={shoe.name} className="max-h-full object-contain mix-blend-multiply p-2" />
-                </div>
-                <h3 className="font-bold text-[#0a0a5c] text-sm md:text-base leading-tight line-clamp-2">{shoe.name || shoe.model}</h3>
-                <p className="text-xs text-gray-500 uppercase mt-1 font-semibold tracking-wide">{shoe.brand}</p>
-                
-                {/* Pastikan slug ada sebelum bikin Link */}
-                {shoe.slug ? (
-                   <Link to={`/shoe/${shoe.slug}`} className="mt-3 text-[10px] font-bold text-white bg-[#0a0a5c] px-3 py-1.5 rounded-full hover:bg-blue-700 transition-colors">VIEW DETAILS</Link>
-                ) : (
-                   <button className="mt-3 text-[10px] font-bold text-gray-400 bg-gray-100 px-3 py-1.5 rounded-full cursor-not-allowed">NO DETAILS</button>
-                )}
+      {/* EMPTY STATE */}
+      {selectedShoes.length === 0 ? (
+        <div className="flex flex-col items-center justify-center min-h-[40vh] mt-6">
+           <div 
+             className="w-full max-w-2xl flex flex-col items-center justify-center cursor-pointer group p-10 
+                        border-2 border-dashed border-gray-300 rounded-3xl bg-white 
+                        hover:border-orange-400 hover:shadow-lg transition-all transform hover:scale-[1.02]" 
+             onClick={() => setIsModalOpen(true)}
+           >
+              <div className="w-16 h-16 rounded-full bg-white shadow-md flex items-center justify-center text-gray-400 
+                              group-hover:bg-orange-500 group-hover:text-white transition-all mb-4 border border-gray-200 
+                              group-hover:border-orange-500">
+                <span className="text-3xl font-light mb-1">+</span>
               </div>
-            ))}
-
-            {selectedShoes.length < 5 && (
-              <div className="flex flex-col items-center justify-center h-full min-h-[240px] border-2 border-dashed border-gray-300 rounded-2xl bg-gray-50/50 hover:bg-white hover:border-orange-400 transition-all cursor-pointer group" onClick={() => setIsModalOpen(true)}>
-                <div className="w-14 h-14 rounded-full bg-white shadow-sm flex items-center justify-center text-gray-400 group-hover:bg-orange-500 group-hover:text-white transition-all mb-3 border border-gray-200 group-hover:border-orange-500">
-                  <span className="text-3xl font-light mb-1">+</span>
-                </div>
-                <span className="text-sm font-bold text-gray-400 group-hover:text-orange-500 uppercase tracking-wider">Add Shoe</span>
-              </div>
-            )}
-
-            {Array.from({ length: Math.max(0, 4 - selectedShoes.length) }).map((_, i) => (<div key={`spacer-${i}`} className="hidden"></div>))}
-          </div>
-
-          {/* 2. DATA ROWS */}
-          <div className="flex flex-col gap-1">
-            {validRows.map((rowConfig, idx) => {
-              const isDifferent = hasDifferences(rowConfig); 
-
-              return (
-                <div 
-                  key={idx} 
-                  className={`grid gap-4 items-center py-4 px-2 rounded-lg transition-colors border border-transparent
-                    ${isDifferent ? 'bg-orange-50 border-orange-100' : (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30')}
-                  `}
-                  style={{ gridTemplateColumns: `200px repeat(${Math.max(selectedShoes.length + 1, 2)}, 1fr)` }}
-                >
-                  <div className={`pl-4 font-bold text-xs uppercase tracking-wider ${isDifferent ? 'text-orange-600' : 'text-gray-500'}`}>
-                    {rowConfig.label}
-                  </div>
-
-                  {selectedShoes.map((shoe, sIdx) => {
-                    const value = rowConfig.getValue(shoe);
-                    return (
-                      <div key={sIdx} className="text-center text-sm text-[#0a0a5c] px-2 flex justify-center items-center h-full">
-                        {Array.isArray(value) ? (
-                          <div className="flex flex-wrap justify-center gap-1.5">
-                            {value.length > 0 ? value.map((v, i) => (
-                              <span key={i} className={`text-[10px] font-bold px-2 py-1 rounded-md shadow-sm border ${isDifferent ? 'bg-white text-orange-600 border-orange-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
-                                {v}
-                              </span>
-                            )) : <span className="text-gray-300">-</span>}
-                          </div>
-                        ) : (
-                          <span className={`font-semibold ${isDifferent ? 'text-black' : ''}`}>{value || <span className="text-gray-300">-</span>}</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {selectedShoes.length < 5 && <div></div>}
-                </div>
-              );
-            })}
-          </div>
-
+              <h3 className="text-lg font-bold text-gray-400 group-hover:text-orange-600 uppercase tracking-widest">Start Comparison</h3>
+              <p className="text-sm text-gray-400 mt-1">Click to add your first shoe</p>
+           </div>
         </div>
-      </div>
+      ) : (
+         /* --- TABLE CONTAINER --- */
+         // UBAH 3: Hapus max-w-7xl karena parent sudah membatasi lebar
+         <div className="overflow-x-auto pb-6 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent mt-4">
+           <div className="min-w-[900px]"> 
+             
+             {/* 1. HEADER ROW */}
+             <div className="grid gap-4 mb-6" style={{ gridTemplateColumns: `200px repeat(${Math.max(selectedShoes.length + 1, 2)}, 1fr)` }}>
+               <div className="flex flex-col justify-end pb-4 font-bold text-gray-400 text-xs uppercase tracking-widest">Models</div>
+
+               {selectedShoes.map((shoe, index) => (
+                 <div key={shoe.shoe_id || index} className="relative bg-white rounded-2xl shadow-sm p-4 border border-gray-100 flex flex-col items-center text-center transition-all hover:shadow-md group">
+                   
+                   {/* BUTTON X (HAPUS) */}
+                   <button 
+                     onClick={() => handleRemoveShoe(index)}
+                     className="absolute top-2 right-2 p-2 bg-gray-100 text-gray-600 rounded-full hover:bg-red-500 hover:text-white transition-all shadow-sm z-10 cursor-pointer"
+                     title="Remove shoe"
+                   >
+                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-4 h-4">
+                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                     </svg>
+                   </button>
+
+                   <div className="w-full h-32 flex items-center justify-center mb-4 relative">
+                     <div className="absolute inset-0 bg-gray-50 rounded-xl -z-10 scale-90 group-hover:scale-100 transition-transform"></div>
+                     <img src={shoe.img_url || shoe.mainImage || "https://placehold.co/100x100?text=No+Image"} alt={shoe.name} className="max-h-full object-contain mix-blend-multiply p-2" />
+                   </div>
+                   <h3 className="font-bold text-[#0a0a5c] text-sm md:text-base leading-tight line-clamp-2">{shoe.name || shoe.model}</h3>
+                   <p className="text-xs text-gray-500 uppercase mt-1 font-semibold tracking-wide">{shoe.brand}</p>
+                   
+                   {shoe.slug ? (
+                      <Link to={`/shoe/${shoe.slug}`} className="mt-3 text-[10px] font-bold text-white bg-[#0a0a5c] px-3 py-1.5 rounded-full hover:bg-blue-700 transition-colors">VIEW DETAILS</Link>
+                   ) : (
+                      <button className="mt-3 text-[10px] font-bold text-gray-400 bg-gray-100 px-3 py-1.5 rounded-full cursor-not-allowed">NO DETAILS</button>
+                   )}
+                 </div>
+               ))}
+
+               {selectedShoes.length < 5 && (
+                 <div className="flex flex-col items-center justify-center h-full min-h-[240px] border-2 border-dashed border-gray-300 rounded-2xl bg-gray-50/50 hover:bg-white hover:border-orange-400 transition-all cursor-pointer group" onClick={() => setIsModalOpen(true)}>
+                   <div className="w-14 h-14 rounded-full bg-white shadow-sm flex items-center justify-center text-gray-400 group-hover:bg-orange-500 group-hover:text-white transition-all mb-3 border border-gray-200 group-hover:border-orange-500">
+                     <span className="text-3xl font-light mb-1">+</span>
+                   </div>
+                   <span className="text-sm font-bold text-gray-400 group-hover:text-orange-500 uppercase tracking-wider">Add Shoe</span>
+                 </div>
+               )}
+
+               {Array.from({ length: Math.max(0, 4 - selectedShoes.length) }).map((_, i) => (<div key={`spacer-${i}`} className="hidden"></div>))}
+             </div>
+
+             {/* 2. DATA ROWS */}
+             <div className="flex flex-col gap-1">
+               {validRows.map((rowConfig, idx) => {
+                 const isDifferent = hasDifferences(rowConfig); 
+
+                 return (
+                   <div 
+                     key={idx} 
+                     className={`grid gap-4 items-center py-4 px-2 rounded-lg transition-colors border
+                       ${isDifferent ? 'bg-orange-50 border-orange-100' : 'bg-white border-transparent'}
+                     `}
+                     style={{ gridTemplateColumns: `200px repeat(${Math.max(selectedShoes.length + 1, 2)}, 1fr)` }}
+                   >
+                     <div className={`pl-4 font-bold text-xs uppercase tracking-wider ${isDifferent ? 'text-orange-600' : 'text-gray-500'}`}>
+                       {rowConfig.label}
+                     </div>
+
+                     {selectedShoes.map((shoe, sIdx) => {
+                       const value = rowConfig.getValue(shoe);
+                       return (
+                         <div key={sIdx} className="text-center text-sm text-[#0a0a5c] px-2 flex justify-center items-center h-full">
+                           {Array.isArray(value) ? (
+                             <div className="flex flex-wrap justify-center gap-1.5">
+                               {value.length > 0 ? value.map((v, i) => (
+                                 <span key={i} className={`text-[10px] font-bold px-2 py-1 rounded-md shadow-sm border ${isDifferent ? 'bg-white text-orange-600 border-orange-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
+                                   {v}
+                                 </span>
+                               )) : <span className="text-gray-300">-</span>}
+                             </div>
+                           ) : (
+                             <span className={`font-semibold ${isDifferent ? 'text-black' : ''}`}>{value || <span className="text-gray-300">-</span>}</span>
+                           )}
+                         </div>
+                       );
+                     })}
+                     {selectedShoes.length < 5 && <div></div>}
+                   </div>
+                 );
+               })}
+             </div>
+
+           </div>
+         </div>
+      )}
 
       {/* --- ADD SHOE MODAL --- */}
       {isModalOpen && (

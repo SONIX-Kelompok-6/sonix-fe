@@ -77,7 +77,7 @@ export default function Favorites() {
           <h2 className="text-xl font-bold text-gray-700">Your Favorites List is Empty</h2>
           <p className="text-gray-500 mb-6 mt-2">Looks like you haven't saved any shoes yet.</p>
           <Link 
-            to="/recommendation" 
+            to="/search" 
             className="px-6 py-3 bg-blue-900 text-white font-bold rounded-lg hover:bg-blue-800 transition-colors shadow-lg"
           >
             Find Shoes Now
@@ -97,7 +97,7 @@ export default function Favorites() {
               {/* TOMBOL HAPUS (TRASH) */}
               <button 
                 onClick={(e) => handleRemoveFavorite(e, shoe.shoe_id)}
-                className="absolute top-3 right-3 p-2.5 bg-white/90 backdrop-blur-sm rounded-full shadow-md text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all z-20"
+                className="absolute top-3 right-3 p-2.5 bg-white/90 backdrop-blur-sm rounded-full shadow-md text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all z-20 cursor-pointer"
                 title="Remove from Favorites"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
