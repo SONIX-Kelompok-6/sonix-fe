@@ -1,84 +1,56 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { sendInteraction } from "../services/SonixMl";
-import api from "../api/axios"; 
-
+import api from "../api/axios";
+import { useShoes } from "../context/ShoeContext"; // Import Context
 
 export default function Favorites() {
-  const [favorites, setFavorites] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // 1. GAK PERLU FETCH API LAGI. AMBIL DARI CONTEXT.
+  const { allShoes, updateShoeState } = useShoes();
+  
+  // 2. Filter Client-Side (Ambil yang isFavorite === true)
+  // Ini INSTANT, 0 detik loading.
+  const favorites = allShoes.filter(shoe => shoe.isFavorite === true);
 
-  // 1. Ambil data favorit pas halaman dibuka
-  useEffect(() => {
-    const fetchFavorites = async () => {
-      const token = localStorage.getItem("userToken");
-      if (!token) {
-        setError("Please login to view your favorites.");
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const response = await api.get("/api/favorites/", {
-          headers: { Authorization: `Token ${token}` },
-        });
-        setFavorites(response.data);
-      } catch (err) {
-        console.error("Gagal ambil favorit", err);
-        setError("Failed to fetch favorites.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchFavorites();
-  }, []);
-
-// 2. Fungsi buat hapus dari favorit
- const handleRemoveFavorite = async (e, shoeId) => {
-    // Stop propagation so clicking trash icon doesn't open details
+  // Fungsi hapus (Update Global Context)
+  const handleRemoveFavorite = async (e, shoeId) => {
     e.preventDefault();
     e.stopPropagation();
 
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId");
 
-    // Optimistic Update: Remove from UI immediately
-    const previousFavorites = [...favorites];
-    setFavorites((prev) => prev.filter((shoe) => shoe.shoe_id !== shoeId));
+    // A. Optimistic Update GLOBAL (Bukan lokal state lagi)
+    // Kita ubah isFavorite jadi false di 'Gudang Utama'
+    const updatedList = allShoes.map(shoe => 
+        shoe.shoe_id === shoeId ? { ...shoe, isFavorite: false } : shoe
+    );
+    updateShoeState(updatedList); // Update Context & Cache
 
     try {
-      // 1. Call Backend API (Database) - CRITICAL
-      // If this fails, we jump to the main 'catch' block (Rollback)
+      // B. Call Backend API
       await api.post(
         "/api/favorites/toggle/",
         { shoe_id: String(shoeId) },
         { headers: { Authorization: `Token ${token}` } }
       );
 
-      // 2. --- CALL ML API (INTERACT) - BEST EFFORT ---
-      // Wrapped in isolated try-catch
+      // C. Call ML API
       if (userId) {
           try {
-             console.log(`[ML] Removing favorite (Unlike). ShoeID: ${shoeId}, Value: 0`);
-             // Parameter: userId, shoeId, actionType ('like'), value (0 for Unlike)
              await sendInteraction(userId, shoeId, 'like', 0);
-             console.log("[ML] Success!");
           } catch (mlErr) {
-             // IF ML FAILS: Log warning only. Do NOT rollback UI.
-             console.warn("[ML] Failed to send interaction, but Database is updated.", mlErr);
+             console.warn("[ML] Failed log.", mlErr);
           }
       }
-      // -----------------------------------
 
     } catch (err) {
-      // This Catch block ONLY runs if the DATABASE (Step 1) fails.
       console.error("Failed to remove favorite (DB Error):", err);
-      
-      // Rollback UI (Put the item back)
-      setFavorites(previousFavorites);
+      // Rollback: Balikin ke state awal dari Context (allShoes belum berubah ref-nya di closure ini)
+      // Tapi karena allShoes di sini udah ke-render ulang, kita perlu logika rollback manual atau fetch ulang.
+      // Sederhananya, fetch ulang aja kalau error biar sinkron:
       alert("Failed to remove favorite. Please check your connection.");
+      window.location.reload(); // Hard refresh termudah untuk rollback sync
     }
   };
 
@@ -96,22 +68,10 @@ export default function Favorites() {
         </div>
       </div>
 
-      {/* KONDISI 1: Loading */}
-      {isLoading && (
-        <div className="flex justify-center items-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
-        </div>
-      )}
+      {/* LOADING DIHAPUS, KARENA DATA DARI CONTEXT (INSTANT) */}
 
-      {/* KONDISI 2: Error */}
-      {!isLoading && error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg text-center font-medium border border-red-100">
-          {error}
-        </div>
-      )}
-
-      {/* KONDISI 3: Kosong (Belum ada favorit) */}
-      {!isLoading && !error && favorites.length === 0 && (
+      {/* KONDISI: Kosong */}
+      {favorites.length === 0 && (
         <div className="text-center py-20 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
           <div className="text-5xl mb-4 grayscale opacity-50">💔</div>
           <h2 className="text-xl font-bold text-gray-700">Your Favorites List is Empty</h2>
@@ -125,8 +85,8 @@ export default function Favorites() {
         </div>
       )}
 
-      {/* KONDISI 4: Ada Data */}
-      {!isLoading && !error && favorites.length > 0 && (
+      {/* KONDISI: Ada Data */}
+      {favorites.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {favorites.map((shoe) => (
             <div 
@@ -165,8 +125,8 @@ export default function Favorites() {
                   
                   {/* Rating (Optional jika ada datanya) */}
                   <div className="mt-auto flex items-center gap-1 text-sm font-medium text-gray-500">
-                     <svg className="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
-                     <span>{shoe.rating || "0.0"}</span>
+                      <svg className="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                      <span>{shoe.rating || "0.0"}</span>
                   </div>
                 </div>
               </Link>

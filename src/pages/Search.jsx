@@ -23,7 +23,7 @@ export default function Search() {
 
     // 2. Kalau gak ada query search, tampilkan SEMUA sepatu (Catalog Mode)
     if (!query) {
-      setFilteredShoes(allShoes);
+      setFilteredShoes([]);
       return;
     }
 
