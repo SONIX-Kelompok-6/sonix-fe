@@ -283,33 +283,46 @@ export default function Compare() {
           setAllShoesDb(shoesList);
         }
 
-        // --- 🔥 LOGIC BARU: HYDRATION (FETCH DETAIL) DARI LOCALSTORAGE 🔥 ---
+        // --- LOGIC HYDRATION CERDAS (FIX MASALAH LU) ---
         const savedSimpleList = JSON.parse(localStorage.getItem("compareList")) || [];
 
         if (savedSimpleList.length > 0) {
-          // Kita fetch ulang detail lengkapnya satu per satu menggunakan slug/id
-          // agar data specs (weight, drop, dll) lengkap.
           const detailedPromises = savedSimpleList.map(async (simpleShoe) => {
-              try {
-                  // Gunakan slug jika ada, kalau tidak gunakan ID (sesuaikan dengan endpoint backend)
-                  const identifier = simpleShoe.slug || simpleShoe.shoe_id;
-                  const res = await api.get(`/api/shoes/${identifier}/`, {
-                      headers: { 'Authorization': `Token ${token}` }
-                  });
-                  return res.data; // Data lengkap dari backend
-              } catch (err) {
-                  console.error(`Gagal ambil detail untuk ${simpleShoe.name}:`, err);
-                  return simpleShoe; // Fallback ke data simple kalau gagal
+            try {
+              // 1. CARI SLUG YANG BENAR PAKE ID
+              // Kita cari sepatu ini di daftar lengkap shoesList pake shoe_id
+              const refShoe = shoesList.find(s => s.shoe_id === simpleShoe.shoe_id);
+              
+              // 2. Tentukan Identifier (Prioritas: Slug dari DB > Slug dari LocalStorage > ID)
+              const realSlug = refShoe?.slug || simpleShoe.slug;
+              const identifier = realSlug || simpleShoe.shoe_id;
+
+              if (!identifier) {
+                console.warn("⚠️ Gak nemu slug/id buat:", simpleShoe.name);
+                return simpleShoe; 
               }
+
+              // 3. Fetch Detail
+              const res = await api.get(`/api/shoes/${identifier}/`, {
+                headers: { 'Authorization': `Token ${token}` }
+              });
+              
+              return res.data; // Data LENGKAP (Weight, Drop, dll)
+
+            } catch (err) {
+              console.error(`❌ Gagal fetch detail ${simpleShoe.name}:`, err);
+              // Fallback: Kalau gagal fetch, coba pake data dari allShoesDb (lumayan lengkap biasanya)
+              const backupData = shoesList.find(s => s.shoe_id === simpleShoe.shoe_id);
+              return backupData || simpleShoe; 
+            }
           });
 
-          // Tunggu semua request selesai (Paralel)
           const fullDetailedShoes = await Promise.all(detailedPromises);
           setSelectedShoes(fullDetailedShoes);
         } else {
           setSelectedShoes([]);
         }
-        // --- END LOGIC HYDRATION ---
+        // --- 🔥 END LOGIC 🔥 ---
 
         // Simpan ID Favorit
         if (favResponse.data) {
