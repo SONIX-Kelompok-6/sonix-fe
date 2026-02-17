@@ -190,49 +190,44 @@ const handleToggleFavorite = async () => {
     }
 };
 
+  // --- ADD TO COMPARE ---
   const handleAddCompare = () => {
     if (!shoeData) return;
 
-    // 1. Ambil list yang sudah ada di memori browser
     let compareList = JSON.parse(localStorage.getItem("compareList")) || [];
 
-    // 2. Cek apakah sepatu ini SUDAH ADA?
-    const isExists = compareList.some((item) => item.shoe_id === shoeData.shoe_id);
-    if (isExists) {
-      alert(`"${shoeData.model}" has already been added to the comparison list!`);
-      return; // Stop di sini kalau duplikat
+    // Cek Duplikat
+    if (compareList.some((item) => item.shoe_id === shoeData.shoe_id)) {
+      alert(`"${shoeData.name || shoeData.model}" is already in the list!`);
+      return;
     }
 
-    // 3. Cek Limit Maksimal 5
+    // Cek Limit
     if (compareList.length >= 5) {
       alert("Max 5 shoes in comparison list!");
       return;
     }
 
-    // 4. Siapkan Data (FIXED VERSION)
+    // Prepare Data
+    // Kita ambil SEMUA data dari backend (...shoeData)
+    // Lalu kita pastikan field vital (slug, name, img_url) terisi standar
     const shoeToSave = {
-        ...shoeData, // Copy semua data detail (Weight, Drop, dll harusnya ikut kebawa di sini)
+        ...shoeData, 
         
-        shoe_id: shoeData.shoe_id,
-        name: shoeData.model, // Standarisasi nama
-        brand: shoeData.brand,
+        // STANDARISASI:
+        // Gunakan 'name' (models.py), fallback ke 'model' (legacy)
+        name: shoeData.name || shoeData.model, 
         
-        // PERBAIKAN UTAMA DI SINI 
-        // Prioritas 1: Ambil dari URL (pasti ada & benar)
-        // Prioritas 2: Ambil dari data backend (kalau ada)
-        slug: slug || shoeData.slug, 
+        // Gunakan 'img_url' (models.py), fallback ke 'mainImage' (legacy)
+        img_url: shoeData.img_url || shoeData.mainImage || "https://via.placeholder.com/500",
         
-        img_url: shoeData.image_url || shoeData.img_url || shoeData.mainImage,
+        // Pastikan slug ada (Prioritas: URL params > data backend)
+        slug: slug || shoeData.slug 
     };
 
-    // 5. Masukkan ke List
     compareList.push(shoeToSave);
-
-    // 6. Simpan balik ke LocalStorage
     localStorage.setItem("compareList", JSON.stringify(compareList));
-
-    // 7. Feedback
-    alert(`Successfully added "${shoeToSave.name}" to comparison list!`);
+    alert(`Successfully added "${shoeToSave.name}" to comparison!`);
   };
 
   if (isLoading) return <div className="flex h-screen items-center justify-center text-white bg-[#4a76a8]">Loading...</div>;

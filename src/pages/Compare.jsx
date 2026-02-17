@@ -4,9 +4,22 @@ import api from "../api/axios";
 
 export default function Compare() {
   const [allShoesDb, setAllShoesDb] = useState([]); 
-  const [selectedShoes, setSelectedShoes] = useState([]);
+  
+  // OPTIMASI 1: Instant Load State
+  // Langsung ambil dari LocalStorage saat inisialisasi biar gak blank/loading
+  const [selectedShoes, setSelectedShoes] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("compareList")) || [];
+    } catch (e) {
+      return [];
+    }
+  });
+
   const [favoriteIds, setFavoriteIds] = useState(new Set());
-  const [isLoading, setIsLoading] = useState(true);
+  
+  // OPTIMASI 2: Matikan Loading Awal
+  // Default false karena kita sudah punya data di selectedShoes
+  const [isLoading, setIsLoading] = useState(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -229,10 +242,12 @@ export default function Compare() {
     },
   ];
 
-  // --- 2. FETCH DATA DARI BACKEND (SAFE MODE) ---
+  // --- 2. FETCH DATA DARI BACKEND (BACKGROUND SYNC) ---
   useEffect(() => {
     const fetchData = async () => {
-      setIsLoading(true);
+      // OPTIMASI: Jangan setIsLoading(true) di sini biar gak muncul spinner
+      // Biarkan dia jalan di background (Silent Update)
+
       const token = localStorage.getItem("userToken");
 
       if (!token) {
@@ -252,44 +267,40 @@ export default function Compare() {
           setAllShoesDb(shoesList);
         }
 
-        // --- 🔥 LOGIC HYDRATION SAFE MODE (ANTI-CRASH) 🔥 ---
+        // --- LOGIC HYDRATION SAFE MODE (BACKGROUND) ---
         const savedList = JSON.parse(localStorage.getItem("compareList")) || [];
 
         if (savedList.length > 0) {
           const detailedPromises = savedList.map(async (simpleShoe) => {
-            // Kita coba pakai slug ATAU shoe_id. 
-            // Kalau slug kosong, kita coba tembak ID (siapa tau backend support /api/shoes/15/)
             const identifier = simpleShoe.slug || simpleShoe.shoe_id;
 
-            if (!identifier) {
-               // Kalau benar-benar gak ada ID, balikin data seadanya.
-               return simpleShoe;
-            }
+            if (!identifier) return simpleShoe;
 
             try {
-              // Coba fetch detail
-              // Note: Kalau backend lu STRICT cuma bisa slug, dan ini shoe_id, dia bakal error 404.
-              // Tapi gak apa-apa, karena udah ada catch block.
+              // Fetch detail terbaru (update harga/data kalau ada perubahan di server)
               const res = await api.get(`/api/shoes/${identifier}/`, {
                  headers: { 'Authorization': `Token ${token}` }
               });
               
-              // SUKSES: Timpa data lama dengan data baru yang lengkap
+              // Gabungkan data lama dan baru
               return { ...simpleShoe, ...res.data }; 
               
             } catch (err) {
-              console.warn(`Gagal fetch detail sepatu: ${simpleShoe.name}. Pake data simple aja.`);
-              // GAGAL: Kembalikan simpleShoe apa adanya (biar minimal gambarnya muncul)
+              console.warn(`Background fetch failed for: ${simpleShoe.name}`);
               return simpleShoe;
             }
           });
 
           const results = await Promise.all(detailedPromises);
+          
+          // Update State & LocalStorage dengan data terbaru dari server
           setSelectedShoes(results);
+          localStorage.setItem("compareList", JSON.stringify(results));
+
         } else {
           setSelectedShoes([]);
         }
-        // --- 🔥 END LOGIC SAFE MODE 🔥 ---
+        // --- END LOGIC  ---
 
         // B. Favorites
         const favResponse = await api.get('/api/favorites/', {
@@ -301,15 +312,14 @@ export default function Compare() {
         }
 
       } catch (error) {
-        console.error("Main fetch error:", error);
+        console.error("Background sync error:", error);
         if (error.response && error.response.status === 401) {
             alert("Session expired. Please login again.");
             localStorage.removeItem("userToken");
             navigate('/login');
         }
-      } finally {
-        setIsLoading(false);
-      }
+      } 
+      // Finally block gak perlu karena kita gak mainan loading state di sini
     };
 
     fetchData();

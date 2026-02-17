@@ -70,49 +70,35 @@ export default function Search() {
     }
   };
 
+  // --- 2. ADD TO COMPARE (VERSI SUPER BERSIH) ---
   const handleAddCompare = (shoe) => {
-    console.log("Add to Compare:", shoe.name);
-    // Logic compare nanti lu tambahin di sini
-    // Ambil list yang sudah ada di memori browser
     let compareList = JSON.parse(localStorage.getItem("compareList")) || [];
 
-    // Cek apakah sepatu ini SUDAH ADA? (Cegah Duplikat)
-    const isExists = compareList.some((item) => item.shoe_id === shoe.shoe_id);
-    if (isExists) {
-      alert(`"${shoe.name}" has already been added to the comparison list!`);
+    // Cek Duplikat
+    if (compareList.some((item) => item.shoe_id === shoe.shoe_id)) {
+      alert(`"${shoe.name}" is already in comparison list!`);
       return;
     }
 
-    // Cek Limit Maksimal 5
+    // Cek Limit
     if (compareList.length >= 5) {
-      alert("Max 5 shoes in comparison list!");
+      alert("Max 5 shoes allowed!");
       return;
     }
 
-    const shoeToSave = {
-      ...shoe, // Copy semua yang ada dari Search (semoga backend lu ngirim spek lengkap di sini)
-
-      // STANDARISASI NAMA FIELD (PENTING!)
-      // Di Search biasanya 'name', di Detail 'model'. Kita seragamkan jadi 'name'.
-      name: shoe.name, 
-
-      // Di Search biasanya 'image_url' atau 'img_url', kita seragamkan jadi 'img_url'
-      // biar sama kayak yang dari Detail Page.
-      img_url: shoe.image_url || shoe.img_url || shoe.mainImage,
-      
-      // Pastikan slug & id terbawa
-      slug: shoe.slug,
-      shoe_id: shoe.shoe_id
+    // SIMPAN APA ADANYA DARI BACKEND 
+    // Karena backend sekarang udah ngasih 'weight_lab_oz', 'drop_lab_mm', dll,
+    // kita simpan mentah-mentah aja. Gak usah mapping manual lagi.
+    const shoeToSave = { 
+        ...shoe,
+        // Pastikan fallback image tersimpan kalau img_url kosong dari backend
+        img_url: shoe.img_url || "https://via.placeholder.com/300x200?text=No+Image" 
     };
 
-    // Masukkan ke List
     compareList.push(shoeToSave);
-
-    // Simpan balik ke LocalStorage
     localStorage.setItem("compareList", JSON.stringify(compareList));
 
-    // Feedback (Opsional: Bisa alert atau Toast notification)
-    alert(`Successfully added "${shoeToSave.name}" to comparison list!`);
+    alert(`Added "${shoe.name}" to comparison!`);
   };
 
   useEffect(() => {
