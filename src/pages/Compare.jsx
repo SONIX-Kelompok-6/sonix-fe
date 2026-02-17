@@ -282,24 +282,18 @@ export default function Compare() {
           const shoesList = Array.isArray(data) ? data : data.results || [];
           setAllShoesDb(shoesList);
           
-          // --- 3. LOGIC MENERIMA DATA DARI SEARCH ---
-          // Cek apakah ada data yang dikirim via navigate state?
-          if (location.state && location.state.newShoe) {
-            const shoeFromSearch = location.state.newShoe;
-            
-            // Cari data lengkapnya di shoesList (biar aman formatnya)
-            const fullShoeData = shoesList.find(s => s.shoe_id === shoeFromSearch.shoe_id) || shoeFromSearch;
-            
-            // Set sepatu yang dipilih (TIMPA yang lama atau tambahkan logika lain jika mau append)
-            // Di sini saya set jadi satu-satunya sepatu yang tampil
-            setSelectedShoes([fullShoeData]);
-
-            // Bersihkan history state biar pas refresh gak nambah lagi
-            window.history.replaceState({}, document.title);
+          // 🔥 UPDATE BAGIAN INI: LOAD DARI LOCALSTORAGE 🔥
+          // 1. Ambil list dari localStorage
+          const savedList = JSON.parse(localStorage.getItem("compareList")) || [];
+          
+          // 2. Set langsung ke state
+          if (savedList.length > 0) {
+             setSelectedShoes(savedList);
           } else {
-            // Kalau tidak ada titipan dari search, default kosong
-            setSelectedShoes([]);
+             setSelectedShoes([]);
           }
+          
+          // Note: Kita gak perlu lagi cek location.state karena sekarang logicnya full localStorage
         }
 
         // Simpan ID Favorit ke Set (Biar pencarian cepat)
@@ -326,16 +320,28 @@ export default function Compare() {
   // --- HANDLERS ---
   const handleAddShoe = (shoe) => {
     if (selectedShoes.length < 5) {
-      setSelectedShoes([...selectedShoes, shoe]);
+      const updatedList = [...selectedShoes, shoe]; // 1. Buat list baru
+      setSelectedShoes(updatedList); // 2. Update State
+      
+      // 3. UPDATE LOCALSTORAGE JUGA 
+      localStorage.setItem("compareList", JSON.stringify(updatedList));
+      
       setIsModalOpen(false);
       setSearchQuery("");
     }
   };
 
   const handleRemoveShoe = (indexToRemove) => {
-    setSelectedShoes(selectedShoes.filter((_, index) => index !== indexToRemove));
+    // 1. Filter sepatu yang mau dihapus
+    const updatedList = selectedShoes.filter((_, index) => index !== indexToRemove);
+    
+    // 2. Update State
+    setSelectedShoes(updatedList);
+    
+    // 🔥 3. UPDATE LOCALSTORAGE JUGA 🔥
+    localStorage.setItem("compareList", JSON.stringify(updatedList));
   };
-
+  
   // --- FILTER & SORTING MODAL ---
   // 1. Filter sepatu yang belum dipilih & sesuai search
   let filteredShoes = allShoesDb.filter(
