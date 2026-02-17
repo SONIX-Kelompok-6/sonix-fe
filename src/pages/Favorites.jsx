@@ -9,7 +9,6 @@ export default function Favorites() {
   const { allShoes, updateShoeState } = useShoes();
   
   // 2. Filter Client-Side (Ambil yang isFavorite === true)
-  // Ini INSTANT, 0 detik loading.
   const favorites = allShoes.filter(shoe => shoe.isFavorite === true);
 
   // Fungsi hapus (Update Global Context)
@@ -20,12 +19,11 @@ export default function Favorites() {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId");
 
-    // A. Optimistic Update GLOBAL (Bukan lokal state lagi)
-    // Kita ubah isFavorite jadi false di 'Gudang Utama'
+    // A. Optimistic Update GLOBAL
     const updatedList = allShoes.map(shoe => 
         shoe.shoe_id === shoeId ? { ...shoe, isFavorite: false } : shoe
     );
-    updateShoeState(updatedList); // Update Context & Cache
+    updateShoeState(updatedList); 
 
     try {
       // B. Call Backend API
@@ -46,11 +44,8 @@ export default function Favorites() {
 
     } catch (err) {
       console.error("Failed to remove favorite (DB Error):", err);
-      // Rollback: Balikin ke state awal dari Context (allShoes belum berubah ref-nya di closure ini)
-      // Tapi karena allShoes di sini udah ke-render ulang, kita perlu logika rollback manual atau fetch ulang.
-      // Sederhananya, fetch ulang aja kalau error biar sinkron:
       alert("Failed to remove favorite. Please check your connection.");
-      window.location.reload(); // Hard refresh termudah untuk rollback sync
+      window.location.reload(); 
     }
   };
 
@@ -68,20 +63,21 @@ export default function Favorites() {
         </div>
       </div>
 
-      {/* LOADING DIHAPUS, KARENA DATA DARI CONTEXT (INSTANT) */}
-
       {/* KONDISI: Kosong */}
       {favorites.length === 0 && (
-        <div className="text-center py-20 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
-          <div className="text-5xl mb-4 grayscale opacity-50">💔</div>
-          <h2 className="text-xl font-bold text-gray-700">Your Favorites List is Empty</h2>
-          <p className="text-gray-500 mb-6 mt-2">Looks like you haven't saved any shoes yet.</p>
-          <Link 
-            to="/search" 
-            className="px-6 py-3 bg-blue-900 text-white font-bold rounded-lg hover:bg-blue-800 transition-colors shadow-lg"
-          >
-            Find Shoes Now
-          </Link>
+        // UBAH: Struktur Wrapper disamakan dengan Compare.jsx
+        <div className="flex flex-col items-center justify-center min-h-[40vh] mt-6">
+           <div className="w-full max-w-2xl text-center p-10 bg-white rounded-3xl border-2 border-dashed border-gray-300">
+             <div className="text-5xl mb-4 grayscale opacity-50">💔</div>
+             <h2 className="text-xl font-bold text-gray-700">Your Favorites List is Empty</h2>
+             <p className="text-gray-500 mb-6 mt-2">Looks like you haven't saved any shoes yet.</p>
+             <Link 
+               to="/search" 
+               className="px-6 py-3 bg-blue-900 text-white font-bold rounded-lg hover:bg-blue-800 transition-colors shadow-lg inline-block"
+             >
+               Find Shoes Now
+             </Link>
+           </div>
         </div>
       )}
 
