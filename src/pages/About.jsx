@@ -1,18 +1,17 @@
 import React from "react";
 import tornPaper from "../assets/about-page/torn-paper.png";
-import rushLogo from "../assets/about-page/logo-dark.png";
+import rushLogo from "../assets/about-page/logo-dark1.svg";
 
 
 export default function About() {
   return (
-    <div className="pt-32">
-
+    <div className="pt-30">
       {/* LOGO */}
-      <div className="flex justify-center mb-14">
+      <div className="flex justify-center mb-0">
         <img 
           src={rushLogo} 
           alt="RUSH Logo" 
-          className="h-100 object-contain"
+          className="h-50 object-contain"
         />
       </div>
 
@@ -24,7 +23,7 @@ export default function About() {
       />
 
       {/* BOX PUTIH CONTENT */}
-      <div className="bg-gray-100 -mt-1">
+      <div className="bg-gradient-to-b from-gray-100 to-white -mt-1">
         <div className="max-w-5xl mx-auto px-10 py-5 grid md:grid-cols-2 gap-16">
 
           {/* LEFT */}
@@ -56,13 +55,6 @@ export default function About() {
 
         </div>
       </div>
-
-      {/* ROBEKAN BAWAH */}
-      <img 
-        src={tornPaper} 
-        alt="Torn Paper" 
-        className="w-full object-cover rotate-180 relative bottom-1"
-      />
 
     </div>
   );
