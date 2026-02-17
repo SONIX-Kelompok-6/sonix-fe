@@ -16,18 +16,9 @@ export default function Compare() {
 
   // --- 1. KONFIGURASI LOGIC TAMPILAN DATA ---
   const SPEC_CONFIG = [
-    {
-      label: "Lightweight",
-      getValue: (s) => s.lightweight ? "✅" : "❌"
-    },
-    {
-      label: "Rocker",
-      getValue: (s) => s.rocker ? "✅" : "❌"
-    },
-    {
-      label: "Removable Insole",
-      getValue: (s) => s.removable_insole ? "✅" : "❌"
-    },
+    { label: "Lightweight", getValue: (s) => s.lightweight ? "✅" : "❌" },
+    { label: "Rocker", getValue: (s) => s.rocker ? "✅" : "❌" },
+    { label: "Removable Insole", getValue: (s) => s.removable_insole ? "✅" : "❌" },
     { 
       label: "Pace", 
       getValue: (s) => {
@@ -56,14 +47,8 @@ export default function Compare() {
         return "-";
       }
     },
-    { 
-      label: "Weight", 
-      getValue: (s) => s.weight_lab_oz ? `${s.weight_lab_oz} oz` : "-" 
-    },
-    { 
-      label: "Heel Drop", 
-      getValue: (s) => s.drop_lab_mm ? `${s.drop_lab_mm} mm` : "-" 
-    },
+    { label: "Weight", getValue: (s) => s.weight_lab_oz ? `${s.weight_lab_oz} oz` : "-" },
+    { label: "Heel Drop", getValue: (s) => s.drop_lab_mm ? `${s.drop_lab_mm} mm` : "-" },
     {
       label: "Shock Absorption",
       getValue: (s) => {
@@ -211,10 +196,7 @@ export default function Compare() {
         return heel_counter.length > 0 ? heel_counter.join(", ") : "-";
       }
     },
-    {
-      label: "Lug Depth",
-      getValue: (s) => s.lug_dept_mm ? `${s.lug_dept_mm} mm` : "-"
-    },
+    { label: "Lug Depth", getValue: (s) => s.lug_dept_mm ? `${s.lug_dept_mm} mm` : "-" },
     {
       label: "Waterproofing",
       getValue: (s) => {
@@ -233,14 +215,8 @@ export default function Compare() {
         return plate.length > 0 ? plate.join(", ") : "-";
       }
     },
-    {
-      label: "Heel Stack",
-      getValue: (s) => s.heel_lab_mm ? `${s.heel_lab_mm} mm` : "-" 
-    },
-    {
-      label: "Forefoot",
-      getValue: (s) => s.forefoot_lab_mm ? `${s.forefoot_lab_mm} mm` : "-"
-    },
+    { label: "Heel Stack", getValue: (s) => s.heel_lab_mm ? `${s.heel_lab_mm} mm` : "-" },
+    { label: "Forefoot", getValue: (s) => s.forefoot_lab_mm ? `${s.forefoot_lab_mm} mm` : "-" },
     {
       label: "Season",
       getValue: (s) => {
@@ -253,7 +229,7 @@ export default function Compare() {
     },
   ];
 
-  // --- 2. FETCH DATA DARI BACKEND ---
+  // --- 2. FETCH DATA DARI BACKEND (SAFE MODE) ---
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -266,72 +242,66 @@ export default function Compare() {
       }
 
       try {
-        // A. Ambil Semua Sepatu (Untuk Modal Add)
+        // A. Ambil List Semua Sepatu (Buat Modal Add aja)
         const shoesResponse = await api.get("/api/shoes/", {
           headers: { 'Authorization': `Token ${token}` }
         });
-        
-        // B. Ambil List Favorit User
-        const favResponse = await api.get('/api/favorites/', {
-          headers: { 'Authorization': `Token ${token}` }
-        });
-
-        // C. Simpan Semua Sepatu untuk Modal
         const data = shoesResponse.data;
         if (data) {
           const shoesList = Array.isArray(data) ? data : data.results || [];
           setAllShoesDb(shoesList);
         }
 
-        // --- LOGIC HYDRATION CERDAS (FIX MASALAH LU) ---
-        const savedSimpleList = JSON.parse(localStorage.getItem("compareList")) || [];
+        // --- 🔥 LOGIC HYDRATION SAFE MODE (ANTI-CRASH) 🔥 ---
+        const savedList = JSON.parse(localStorage.getItem("compareList")) || [];
 
-        if (savedSimpleList.length > 0) {
-          const detailedPromises = savedSimpleList.map(async (simpleShoe) => {
+        if (savedList.length > 0) {
+          const detailedPromises = savedList.map(async (simpleShoe) => {
+            // Kita coba pakai slug ATAU shoe_id. 
+            // Kalau slug kosong, kita coba tembak ID (siapa tau backend support /api/shoes/15/)
+            const identifier = simpleShoe.slug || simpleShoe.shoe_id;
+
+            if (!identifier) {
+               // Kalau benar-benar gak ada ID, balikin data seadanya.
+               return simpleShoe;
+            }
+
             try {
-              // 1. CARI SLUG YANG BENAR PAKE ID
-              // Kita cari sepatu ini di daftar lengkap shoesList pake shoe_id
-              const refShoe = shoesList.find(s => s.shoe_id === simpleShoe.shoe_id);
-              
-              // 2. Tentukan Identifier (Prioritas: Slug dari DB > Slug dari LocalStorage > ID)
-              const realSlug = refShoe?.slug || simpleShoe.slug;
-              const identifier = realSlug || simpleShoe.shoe_id;
-
-              if (!identifier) {
-                console.warn("⚠️ Gak nemu slug/id buat:", simpleShoe.name);
-                return simpleShoe; 
-              }
-
-              // 3. Fetch Detail
+              // Coba fetch detail
+              // Note: Kalau backend lu STRICT cuma bisa slug, dan ini shoe_id, dia bakal error 404.
+              // Tapi gak apa-apa, karena udah ada catch block.
               const res = await api.get(`/api/shoes/${identifier}/`, {
-                headers: { 'Authorization': `Token ${token}` }
+                 headers: { 'Authorization': `Token ${token}` }
               });
               
-              return res.data; // Data LENGKAP (Weight, Drop, dll)
-
+              // SUKSES: Timpa data lama dengan data baru yang lengkap
+              return { ...simpleShoe, ...res.data }; 
+              
             } catch (err) {
-              console.error(`❌ Gagal fetch detail ${simpleShoe.name}:`, err);
-              // Fallback: Kalau gagal fetch, coba pake data dari allShoesDb (lumayan lengkap biasanya)
-              const backupData = shoesList.find(s => s.shoe_id === simpleShoe.shoe_id);
-              return backupData || simpleShoe; 
+              console.warn(`Gagal fetch detail sepatu: ${simpleShoe.name}. Pake data simple aja.`);
+              // GAGAL: Kembalikan simpleShoe apa adanya (biar minimal gambarnya muncul)
+              return simpleShoe;
             }
           });
 
-          const fullDetailedShoes = await Promise.all(detailedPromises);
-          setSelectedShoes(fullDetailedShoes);
+          const results = await Promise.all(detailedPromises);
+          setSelectedShoes(results);
         } else {
           setSelectedShoes([]);
         }
-        // --- 🔥 END LOGIC 🔥 ---
+        // --- 🔥 END LOGIC SAFE MODE 🔥 ---
 
-        // Simpan ID Favorit
+        // B. Favorites
+        const favResponse = await api.get('/api/favorites/', {
+          headers: { 'Authorization': `Token ${token}` }
+        });
         if (favResponse.data) {
           const ids = new Set(favResponse.data.map(item => item.shoe_id));
           setFavoriteIds(ids);
         }
 
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Main fetch error:", error);
         if (error.response && error.response.status === 401) {
             alert("Session expired. Please login again.");
             localStorage.removeItem("userToken");
@@ -348,15 +318,11 @@ export default function Compare() {
   // --- HANDLERS ---
   const handleAddShoe = (shoe) => {
     if (selectedShoes.length < 5) {
-      // Logic Hydration juga bisa diterapkan disini jika data dari modal belum lengkap
-      // Tapi biasanya dari allShoesDb (API /api/shoes/) datanya sudah cukup
+      // Saat add manual, kita juga simpan
       const updatedList = [...selectedShoes, shoe];
-      
       setSelectedShoes(updatedList);
       setIsModalOpen(false);
       setSearchQuery("");
-      
-      // Update LocalStorage
       localStorage.setItem("compareList", JSON.stringify(updatedList));
     }
   };
@@ -364,8 +330,6 @@ export default function Compare() {
   const handleRemoveShoe = (indexToRemove) => {
     const updatedList = selectedShoes.filter((_, index) => index !== indexToRemove);
     setSelectedShoes(updatedList);
-    
-    // Update LocalStorage
     localStorage.setItem("compareList", JSON.stringify(updatedList));
   };
 
@@ -446,7 +410,12 @@ export default function Compare() {
                 <h3 className="font-bold text-[#0a0a5c] text-sm md:text-base leading-tight line-clamp-2">{shoe.name || shoe.model}</h3>
                 <p className="text-xs text-gray-500 uppercase mt-1 font-semibold tracking-wide">{shoe.brand}</p>
                 
-                <Link to={`/shoe/${shoe.slug}`} className="mt-3 text-[10px] font-bold text-white bg-[#0a0a5c] px-3 py-1.5 rounded-full hover:bg-blue-700 transition-colors">VIEW DETAILS</Link>
+                {/* Pastikan slug ada sebelum bikin Link */}
+                {shoe.slug ? (
+                   <Link to={`/shoe/${shoe.slug}`} className="mt-3 text-[10px] font-bold text-white bg-[#0a0a5c] px-3 py-1.5 rounded-full hover:bg-blue-700 transition-colors">VIEW DETAILS</Link>
+                ) : (
+                   <button className="mt-3 text-[10px] font-bold text-gray-400 bg-gray-100 px-3 py-1.5 rounded-full cursor-not-allowed">NO DETAILS</button>
+                )}
               </div>
             ))}
 

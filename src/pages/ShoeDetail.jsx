@@ -218,7 +218,7 @@ const handleToggleFavorite = async () => {
         name: shoeData.model, // Di detail namanya 'model', tapi di search biasanya 'name', sesuaikan
         brand: shoeData.brand,
         slug: shoeData.slug,
-        img_url: shoeData.mainImage, // Sesuaikan key image biar seragam
+        img_url: shoeData.image_url || shoeData.img_url || shoeData.mainImage, // Sesuaikan key image biar seragam
         // ... field lain yang dirasa perlu buat preview di tabel compare
     };
 
