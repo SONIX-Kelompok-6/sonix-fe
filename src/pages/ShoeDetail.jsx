@@ -142,6 +142,48 @@ export default function ShoeDetail() {
     }
   };
 
+  const handleAddCompare = () => {
+    if (!shoeData) return;
+
+    // 1. Ambil list yang sudah ada di memori browser
+    let compareList = JSON.parse(localStorage.getItem("compareList")) || [];
+
+    // 2. Cek apakah sepatu ini SUDAH ADA? (Cegah Duplikat)
+    // Kita pakai shoeData.shoe_id (pastikan backend kirim ini)
+    const isExists = compareList.some((item) => item.shoe_id === shoeData.shoe_id);
+    if (isExists) {
+      alert(`"${shoeData.model}" has already been added to the comparison list!`);
+      return;
+    }
+
+    // 3. Cek Limit Maksimal 5
+    if (compareList.length >= 5) {
+      alert("Max 5 shoes in comparison list!");
+      return;
+    }
+
+    // 4. Siapkan Data yang Mau Disimpan (Sesuaikan dengan struktur yang dipakai di Search.jsx)
+    // Pastikan field-field penting terbawa (shoe_id, name/model, brand, image_url, slug)
+    const shoeToSave = {
+        ...shoeData,
+        shoe_id: shoeData.shoe_id,
+        name: shoeData.model, // Di detail namanya 'model', tapi di search biasanya 'name', sesuaikan
+        brand: shoeData.brand,
+        slug: shoeData.slug,
+        img_url: shoeData.mainImage, // Sesuaikan key image biar seragam
+        // ... field lain yang dirasa perlu buat preview di tabel compare
+    };
+
+    // 5. Masukkan ke List
+    compareList.push(shoeToSave);
+
+    // 6. Simpan balik ke LocalStorage
+    localStorage.setItem("compareList", JSON.stringify(compareList));
+
+    // 7. Feedback
+    alert(`Successfully added "${shoeData.model}" to comparison list!`);
+  };
+
   if (isLoading) return <div className="flex h-screen items-center justify-center text-white bg-[#4a76a8]">Loading...</div>;
   if (error) return <div className="flex h-screen items-center justify-center text-white bg-[#4a76a8]">{error}</div>;
   if (!shoeData) return <div className="flex h-screen items-center justify-center text-white bg-[#4a76a8]">Shoe not found.</div>;
