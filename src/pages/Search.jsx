@@ -72,6 +72,46 @@ export default function Search() {
   const handleAddCompare = (shoe) => {
     console.log("Add to Compare:", shoe.name);
     // Logic compare nanti lu tambahin di sini
+    // Ambil list yang sudah ada di memori browser
+    let compareList = JSON.parse(localStorage.getItem("compareList")) || [];
+
+    // Cek apakah sepatu ini SUDAH ADA? (Cegah Duplikat)
+    const isExists = compareList.some((item) => item.shoe_id === shoe.shoe_id);
+    if (isExists) {
+      alert(`"${shoe.name}" has already been added to the comparison list!`);
+      return;
+    }
+
+    // Cek Limit Maksimal 5
+    if (compareList.length >= 5) {
+      alert("Max 5 shoes in comparison list!");
+      return;
+    }
+
+    const shoeToSave = {
+      ...shoe, // Copy semua yang ada dari Search (semoga backend lu ngirim spek lengkap di sini)
+
+      // STANDARISASI NAMA FIELD (PENTING!)
+      // Di Search biasanya 'name', di Detail 'model'. Kita seragamkan jadi 'name'.
+      name: shoe.name, 
+
+      // Di Search biasanya 'image_url' atau 'img_url', kita seragamkan jadi 'img_url'
+      // biar sama kayak yang dari Detail Page.
+      img_url: shoe.image_url || shoe.img_url || shoe.mainImage,
+      
+      // Pastikan slug & id terbawa
+      slug: shoe.slug,
+      shoe_id: shoe.shoe_id
+    };
+
+    // Masukkan ke List
+    compareList.push(shoeToSave);
+
+    // Simpan balik ke LocalStorage
+    localStorage.setItem("compareList", JSON.stringify(compareList));
+
+    // Feedback (Opsional: Bisa alert atau Toast notification)
+    alert(`Successfully added "${shoeToSave.name}" to comparison list!`);
   };
 
   useEffect(() => {

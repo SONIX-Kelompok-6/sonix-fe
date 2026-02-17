@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom'; // 1. Tambah useLocation
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import api from "../api/axios"; 
 
 export default function Compare() {
@@ -12,7 +12,7 @@ export default function Compare() {
   const [searchQuery, setSearchQuery] = useState("");
   
   const navigate = useNavigate();
-  const location = useLocation(); // 2. Init location untuk tangkap data
+  const location = useLocation();
 
   // --- 1. KONFIGURASI LOGIC TAMPILAN DATA ---
   const SPEC_CONFIG = [
@@ -266,43 +266,52 @@ export default function Compare() {
       }
 
       try {
-        // A. Ambil Semua Sepatu
+        // A. Ambil Semua Sepatu (Untuk Modal Add)
         const shoesResponse = await api.get("/api/shoes/", {
           headers: { 'Authorization': `Token ${token}` }
         });
         
-        // B. Ambil List Favorit User (Untuk sorting di modal)
+        // B. Ambil List Favorit User
         const favResponse = await api.get('/api/favorites/', {
           headers: { 'Authorization': `Token ${token}` }
         });
 
-        // Simpan Data Sepatu
+        // C. Simpan Semua Sepatu untuk Modal
         const data = shoesResponse.data;
         if (data) {
           const shoesList = Array.isArray(data) ? data : data.results || [];
           setAllShoesDb(shoesList);
-          
-          // --- 3. LOGIC MENERIMA DATA DARI SEARCH ---
-          // Cek apakah ada data yang dikirim via navigate state?
-          if (location.state && location.state.newShoe) {
-            const shoeFromSearch = location.state.newShoe;
-            
-            // Cari data lengkapnya di shoesList (biar aman formatnya)
-            const fullShoeData = shoesList.find(s => s.shoe_id === shoeFromSearch.shoe_id) || shoeFromSearch;
-            
-            // Set sepatu yang dipilih (TIMPA yang lama atau tambahkan logika lain jika mau append)
-            // Di sini saya set jadi satu-satunya sepatu yang tampil
-            setSelectedShoes([fullShoeData]);
-
-            // Bersihkan history state biar pas refresh gak nambah lagi
-            window.history.replaceState({}, document.title);
-          } else {
-            // Kalau tidak ada titipan dari search, default kosong
-            setSelectedShoes([]);
-          }
         }
 
-        // Simpan ID Favorit ke Set (Biar pencarian cepat)
+        // --- 🔥 LOGIC BARU: HYDRATION (FETCH DETAIL) DARI LOCALSTORAGE 🔥 ---
+        const savedSimpleList = JSON.parse(localStorage.getItem("compareList")) || [];
+
+        if (savedSimpleList.length > 0) {
+          // Kita fetch ulang detail lengkapnya satu per satu menggunakan slug/id
+          // agar data specs (weight, drop, dll) lengkap.
+          const detailedPromises = savedSimpleList.map(async (simpleShoe) => {
+              try {
+                  // Gunakan slug jika ada, kalau tidak gunakan ID (sesuaikan dengan endpoint backend)
+                  const identifier = simpleShoe.slug || simpleShoe.shoe_id;
+                  const res = await api.get(`/api/shoes/${identifier}/`, {
+                      headers: { 'Authorization': `Token ${token}` }
+                  });
+                  return res.data; // Data lengkap dari backend
+              } catch (err) {
+                  console.error(`Gagal ambil detail untuk ${simpleShoe.name}:`, err);
+                  return simpleShoe; // Fallback ke data simple kalau gagal
+              }
+          });
+
+          // Tunggu semua request selesai (Paralel)
+          const fullDetailedShoes = await Promise.all(detailedPromises);
+          setSelectedShoes(fullDetailedShoes);
+        } else {
+          setSelectedShoes([]);
+        }
+        // --- END LOGIC HYDRATION ---
+
+        // Simpan ID Favorit
         if (favResponse.data) {
           const ids = new Set(favResponse.data.map(item => item.shoe_id));
           setFavoriteIds(ids);
@@ -321,37 +330,44 @@ export default function Compare() {
     };
 
     fetchData();
-  }, [navigate, location]); // Tambahkan location ke dependency array
+  }, [navigate]); 
 
   // --- HANDLERS ---
   const handleAddShoe = (shoe) => {
     if (selectedShoes.length < 5) {
-      setSelectedShoes([...selectedShoes, shoe]);
+      // Logic Hydration juga bisa diterapkan disini jika data dari modal belum lengkap
+      // Tapi biasanya dari allShoesDb (API /api/shoes/) datanya sudah cukup
+      const updatedList = [...selectedShoes, shoe];
+      
+      setSelectedShoes(updatedList);
       setIsModalOpen(false);
       setSearchQuery("");
+      
+      // Update LocalStorage
+      localStorage.setItem("compareList", JSON.stringify(updatedList));
     }
   };
 
   const handleRemoveShoe = (indexToRemove) => {
-    setSelectedShoes(selectedShoes.filter((_, index) => index !== indexToRemove));
+    const updatedList = selectedShoes.filter((_, index) => index !== indexToRemove);
+    setSelectedShoes(updatedList);
+    
+    // Update LocalStorage
+    localStorage.setItem("compareList", JSON.stringify(updatedList));
   };
 
   // --- FILTER & SORTING MODAL ---
-  // 1. Filter sepatu yang belum dipilih & sesuai search
   let filteredShoes = allShoesDb.filter(
     dbShoe => !selectedShoes.find(s => s.shoe_id === dbShoe.shoe_id) && 
               dbShoe.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // 2. SORTING: Favorit ditaruh paling atas
   filteredShoes.sort((a, b) => {
     const isAFav = favoriteIds.has(a.shoe_id);
     const isBFav = favoriteIds.has(b.shoe_id);
-    // Jika A favorit & B bukan -> A duluan (-1)
     if (isAFav && !isBFav) return -1;
-    // Jika B favorit & A bukan -> B duluan (1)
     if (!isAFav && isBFav) return 1;
-    return 0; // Sama-sama favorit atau bukan -> urutan tetap
+    return 0;
   });
 
   // --- FILTER ROW LOGIC ---
@@ -362,14 +378,10 @@ export default function Compare() {
     });
   });
 
-  // --- CHECK DIFFERENCE LOGIC (Untuk Highlight) ---
+  // --- CHECK DIFFERENCE LOGIC ---
   const hasDifferences = (rowConfig) => {
-    if (selectedShoes.length < 2) return false; // Gak usah highlight kalo cuma 1 sepatu
-    
-    // Ambil value sepatu pertama sebagai acuan (convert ke string biar mudah bandingin array)
+    if (selectedShoes.length < 2) return false;
     const firstVal = JSON.stringify(rowConfig.getValue(selectedShoes[0]));
-    
-    // Cek apakah ada sepatu lain yang valuenya beda
     return selectedShoes.some(s => JSON.stringify(rowConfig.getValue(s)) !== firstVal);
   };
 
@@ -415,9 +427,10 @@ export default function Compare() {
 
                 <div className="w-full h-32 flex items-center justify-center mb-4 relative">
                   <div className="absolute inset-0 bg-gray-50 rounded-xl -z-10 scale-90 group-hover:scale-100 transition-transform"></div>
-                  <img src={shoe.img_url || "https://placehold.co/100x100?text=No+Image"} alt={shoe.name} className="max-h-full object-contain mix-blend-multiply p-2" />
+                  {/* Gunakan img_url (dari search) atau mainImage (dari detail) */}
+                  <img src={shoe.img_url || shoe.mainImage || "https://placehold.co/100x100?text=No+Image"} alt={shoe.name} className="max-h-full object-contain mix-blend-multiply p-2" />
                 </div>
-                <h3 className="font-bold text-[#0a0a5c] text-sm md:text-base leading-tight line-clamp-2">{shoe.name}</h3>
+                <h3 className="font-bold text-[#0a0a5c] text-sm md:text-base leading-tight line-clamp-2">{shoe.name || shoe.model}</h3>
                 <p className="text-xs text-gray-500 uppercase mt-1 font-semibold tracking-wide">{shoe.brand}</p>
                 
                 <Link to={`/shoe/${shoe.slug}`} className="mt-3 text-[10px] font-bold text-white bg-[#0a0a5c] px-3 py-1.5 rounded-full hover:bg-blue-700 transition-colors">VIEW DETAILS</Link>
@@ -439,12 +452,11 @@ export default function Compare() {
           {/* 2. DATA ROWS */}
           <div className="flex flex-col gap-1">
             {validRows.map((rowConfig, idx) => {
-              const isDifferent = hasDifferences(rowConfig); // Cek apakah data beda
+              const isDifferent = hasDifferences(rowConfig); 
 
               return (
                 <div 
                   key={idx} 
-                  // LOGIC WARNA: Kalau beda -> bg-orange-50, kalau sama -> putih/abu selang-seling
                   className={`grid gap-4 items-center py-4 px-2 rounded-lg transition-colors border border-transparent
                     ${isDifferent ? 'bg-orange-50 border-orange-100' : (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30')}
                   `}
@@ -503,18 +515,16 @@ export default function Compare() {
             <div className="flex-1 overflow-y-auto p-2 bg-gray-50">
               {filteredShoes.length > 0 ? (
                 filteredShoes.map(shoe => {
-                  const isFav = favoriteIds.has(shoe.shoe_id); // Cek status favorit
+                  const isFav = favoriteIds.has(shoe.shoe_id);
                   return (
                     <div key={shoe.shoe_id} onClick={() => handleAddShoe(shoe)} className={`flex items-center gap-4 p-3 mb-2 rounded-xl border shadow-sm cursor-pointer transition-all group ${isFav ? 'bg-yellow-50 border-yellow-200 hover:border-yellow-400' : 'bg-white border-gray-100 hover:border-orange-300 hover:shadow-md'}`}>
                       <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center p-1 border border-gray-200 relative">
-                          <img src={shoe['img-url'] || "https://placehold.co/100x100?text=No+Image"} alt={shoe.name} className="max-h-full object-contain mix-blend-multiply" />
-                          {/* Bintang Favorit Kecil di Gambar */}
+                          <img src={shoe['img-url'] || shoe.mainImage || "https://placehold.co/100x100?text=No+Image"} alt={shoe.name} className="max-h-full object-contain mix-blend-multiply" />
                           {isFav && <span className="absolute -top-2 -right-2 text-yellow-400 drop-shadow-sm text-lg">★</span>}
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                             <p className="font-bold text-[#0a0a5c] text-sm group-hover:text-orange-600 transition-colors">{shoe.name}</p>
-                            {/* Label Favorit di Teks */}
                             {isFav && <span className="text-[10px] bg-yellow-400 text-white px-1.5 py-0.5 rounded font-bold shadow-sm">FAVORITE</span>}
                         </div>
                         <p className="text-xs text-gray-500 uppercase tracking-wide">{shoe.brand}</p>
