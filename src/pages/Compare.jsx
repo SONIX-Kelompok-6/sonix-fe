@@ -367,12 +367,9 @@ export default function Compare() {
   }
 
   return (
-    // UBAH 1: Container utama disamakan class-nya dengan Favorites.jsx
-    // Menggunakan max-w-6xl, mx-auto, padding yang konsisten, dan background default (putih)
     <div className="max-w-6xl mx-auto px-6 pb-12 pt-8 min-h-screen font-sans">
       
       {/* HEADER */}
-      {/* UBAH 2: Header disesuaikan dengan Favorites (border-b, padding, margin) */}
       <div className="mb-8 border-b pb-4 flex flex-col md:flex-row justify-between items-end gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Compare Shoes</h1>
@@ -389,21 +386,22 @@ export default function Compare() {
            <div 
              className="w-full max-w-2xl flex flex-col items-center justify-center cursor-pointer group p-10 
                         border-2 border-dashed border-gray-300 rounded-3xl bg-white 
-                        hover:border-orange-400 hover:shadow-lg transition-all transform hover:scale-[1.02]" 
+                        transition-all"  // UBAH: Menghapus hover:shadow, hover:scale, dll
              onClick={() => setIsModalOpen(true)}
            >
-              <div className="w-16 h-16 rounded-full bg-white shadow-md flex items-center justify-center text-gray-400 
-                              group-hover:bg-orange-500 group-hover:text-white transition-all mb-4 border border-gray-200 
-                              group-hover:border-orange-500">
+              <div className="w-16 h-16 rounded-full bg-gray-50 shadow-sm flex items-center justify-center text-gray-400 
+                              group-hover:bg-orange-500 group-hover:text-white transition-all duration-300 mb-4 
+                              border border-gray-200 group-hover:border-orange-500">
                 <span className="text-3xl font-light mb-1">+</span>
               </div>
-              <h3 className="text-lg font-bold text-gray-400 group-hover:text-orange-600 uppercase tracking-widest">Start Comparison</h3>
-              <p className="text-sm text-gray-400 mt-1">Click to add your first shoe</p>
+              
+              {/* UBAH: Styling Teks agar mirip Page Favorites */}
+              <h2 className="text-xl font-bold text-gray-700">Start Comparison</h2>
+              <p className="text-gray-500 mt-2">Click to add your first shoe</p>
            </div>
         </div>
       ) : (
          /* --- TABLE CONTAINER --- */
-         // UBAH 3: Hapus max-w-7xl karena parent sudah membatasi lebar
          <div className="overflow-x-auto pb-6 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent mt-4">
            <div className="min-w-[900px]"> 
              
