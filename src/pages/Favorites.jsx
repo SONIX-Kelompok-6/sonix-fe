@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { sendInteraction } from "../services/SonixMl";
 import api from "../api/axios"; 
+
 
 export default function Favorites() {
   const [favorites, setFavorites] = useState([]);
@@ -33,28 +35,50 @@ export default function Favorites() {
     fetchFavorites();
   }, []);
 
-  // 2. Fungsi buat hapus dari favorit
-  const handleRemoveFavorite = async (e, shoeId) => {
-    // Stop propagasi biar pas klik tong sampah, gak kebuka link detail sepatunya
+// 2. Fungsi buat hapus dari favorit
+ const handleRemoveFavorite = async (e, shoeId) => {
+    // Stop propagation so clicking trash icon doesn't open details
     e.preventDefault();
     e.stopPropagation();
 
     const token = localStorage.getItem("userToken");
-    
-    // Optimistic Update: Hapus dari layar dulu biar kerasa cepet
+    const userId = localStorage.getItem("userId");
+
+    // Optimistic Update: Remove from UI immediately
     const previousFavorites = [...favorites];
     setFavorites((prev) => prev.filter((shoe) => shoe.shoe_id !== shoeId));
 
     try {
+      // 1. Call Backend API (Database) - CRITICAL
+      // If this fails, we jump to the main 'catch' block (Rollback)
       await api.post(
         "/api/favorites/toggle/",
         { shoe_id: String(shoeId) },
         { headers: { Authorization: `Token ${token}` } }
       );
+
+      // 2. --- CALL ML API (INTERACT) - BEST EFFORT ---
+      // Wrapped in isolated try-catch
+      if (userId) {
+          try {
+             console.log(`[ML] Removing favorite (Unlike). ShoeID: ${shoeId}, Value: 0`);
+             // Parameter: userId, shoeId, actionType ('like'), value (0 for Unlike)
+             await sendInteraction(userId, shoeId, 'like', 0);
+             console.log("[ML] Success!");
+          } catch (mlErr) {
+             // IF ML FAILS: Log warning only. Do NOT rollback UI.
+             console.warn("[ML] Failed to send interaction, but Database is updated.", mlErr);
+          }
+      }
+      // -----------------------------------
+
     } catch (err) {
-      // Kalau gagal, balikin lagi datanya (Rollback)
+      // This Catch block ONLY runs if the DATABASE (Step 1) fails.
+      console.error("Failed to remove favorite (DB Error):", err);
+      
+      // Rollback UI (Put the item back)
       setFavorites(previousFavorites);
-      alert("Failed to remove favorite. Check your connection.");
+      alert("Failed to remove favorite. Please check your connection.");
     }
   };
 

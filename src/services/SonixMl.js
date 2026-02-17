@@ -14,13 +14,14 @@ export const getRecommendations = async (type, payload) => {
 };
 
 // Fungsi untuk Collaborative (Like/Interact) - Maksud Shane
-export const sendInteraction = async (userId, shoeId, actionType) => {
+export const sendInteraction = async (userId, shoeId, actionType, value) => {
   const response = await mlApi.post('/interact', {
     user_id: userId,
     shoe_id: String(shoeId),
-    action_type: actionType
+    action_type: actionType,
+    value: value
   });
-  return response.data.data; // Balikan "You Might Also Like"
+  return response.data.data; 
 };
 
 // Fungsi untuk Hybrid Feed (Halaman Depan)
