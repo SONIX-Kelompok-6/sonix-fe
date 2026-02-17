@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import Navbar from "../components/Navbar";
 import { FaHeart, FaRegHeart, FaStar, FaPlus } from "react-icons/fa";
-import api from "../api/axios"; 
+import { sendInteraction } from "../services/SonixMl";
+import Navbar from "../components/Navbar";
+import api from "../api/axios";
 
 export default function ShoeDetail() {
   const { slug } = useParams();
@@ -15,6 +16,7 @@ export default function ShoeDetail() {
   // 1. Cek Token & Email
   const token = localStorage.getItem("userToken");
   const currentUserEmail = localStorage.getItem("userEmail");
+  const storedUserName = localStorage.getItem("userName");
 
   // 2. State untuk menyimpan nama random (dibuat sekali saat komponen mount)
   const [randomGuestName] = useState(() => {
@@ -23,10 +25,21 @@ export default function ShoeDetail() {
   });
 
   // 3. Tentukan nama yang dipakai: Kalau login pakai email, kalau tidak pakai randomGuestName
-  const currentUserName = (token && currentUserEmail) 
-    ? currentUserEmail.split('@')[0] 
-    : randomGuestName;
-  // --- END UPDATE ---
+const currentUserName = (() => {
+    if (!token) return randomGuestName; // Kalau tidak login -> Random Guest
+
+    if (storedUserName) return storedUserName; // Kalau ada username -> Pakai Username
+    
+    if (currentUserEmail) {
+        // Kalau cuma ada email -> Ambil nama depan sebelum '@'
+        // Contoh: "shane@gmail.com" -> "shane"
+        const nameFromEmail = currentUserEmail.split('@')[0];
+        // Opsional: Bikin huruf pertama kapital biar rapi
+        return nameFromEmail.charAt(0).toUpperCase() + nameFromEmail.slice(1);
+    }
+
+    return "User"; 
+  })();
 
   useEffect(() => {
     const fetchShoeDetail = async () => {
@@ -118,15 +131,30 @@ export default function ShoeDetail() {
     }
   };
 
-  const handleToggleFavorite = async () => {
+
+
+
+const handleToggleFavorite = async () => {
     const token = localStorage.getItem("userToken");
+    const userId = localStorage.getItem("userId"); 
+
     if (!token) {
       alert("Please login first to save this shoe to your favorites.");
       return;
     }
+
     const previousStatus = shoeData.isFavorite;
+    
+    // Logic Value: 
+    // If previous was True (Favorite) -> User wants to UNLIKE -> Value 0
+    // If previous was False (Not Favorite) -> User wants to LIKE -> Value 1
+    const interactionValue = previousStatus ? 0 : 1;
+
+    // 1. Optimistic Update UI
     setShoeData({ ...shoeData, isFavorite: !previousStatus });
+
     try {
+      // 2. Call Backend API (Database) - MUST SUCCEED
       const response = await api.post(
         "/api/favorites/toggle/",
         { shoe_id: shoeData.shoe_id },
@@ -134,13 +162,33 @@ export default function ShoeDetail() {
           headers: { Authorization: `Token ${token}` },
         }
       );
+      
+      // Update state based on server response (for safety)
       setShoeData({ ...shoeData, isFavorite: response.data.is_favorite });
+
+      // 3. --- CALL ML API (INTERACT) ---
+      // Isolated Try-Catch so it doesn't break the main flow
+      if (userId) {
+          try {
+             console.log(`[ML] Sending interaction from Detail Page...`);
+             await sendInteraction(userId, shoeData.shoe_id, 'like', interactionValue);
+             console.log("[ML] Success!");
+          } catch (mlErr) {
+             // IF ML FAILS: Just log a warning. Do NOT rollback.
+             console.warn("[ML] Failed to interact, but Database saved successfully.", mlErr);
+          }
+      }
+      // -----------------------------------
+
     } catch (err) {
-      console.error("Failed to update favorite:", err);
+      // This Catch block ONLY runs if the DATABASE (Step 2) fails.
+      console.error("Failed to update favorite (DB Error):", err);
+      
+      // Rollback UI to previous state
       setShoeData({ ...shoeData, isFavorite: previousStatus });
       alert("Something went wrong. Please try again later.");
     }
-  };
+};
 
   const handleAddCompare = () => {
     if (!shoeData) return;
@@ -223,7 +271,12 @@ export default function ShoeDetail() {
                   </div>
                   <span className="text-2xl font-bold text-gray-700">{shoeData.rating || 0}</span>
                 </div>
-                <button className="bg-[#0a0a5c] text-white px-8 py-3 rounded-full font-bold hover:bg-blue-900 transition-colors">Compare</button>
+                <button 
+                  onClick={handleAddCompare} // <--- TAMBAHKAN INI
+                  className="bg-[#0a0a5c] text-white px-8 py-3 rounded-full font-bold hover:bg-blue-900 transition-colors"
+                >
+                  Compare
+                </button>
               </div>
             </div>
           </div>

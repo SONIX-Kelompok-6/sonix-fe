@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from "react";
 import api from "../api/axios"; 
 import { useNavigate, Link } from "react-router-dom";
-// --- IMPORT SERVICE ML ---
-import { getRecommendations, sendInteraction, getUserFeed } from "../services/SonixMl"; 
+import { getRecommendations, sendInteraction, getUserFeed } from "../services/SonixMl";
+
 
 // --- IMPORT ASSETS ---
 import roadImg from "../assets/recommendation-page/road.png";
@@ -186,29 +186,70 @@ export default function Recommendation() {
     }
   };
 
-  // --- HANDLE ADD FAVORITE (DUAL WRITE) ---
   const handleAddFavorite = async (shoeId) => {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId");
-    if (!token) { setError("Please login to save favorites."); return; }
+    
+    if (!token) { 
+        setError("Please login to save favorites."); 
+        return; 
+    }
 
     const idString = String(shoeId);
     const isCurrentlyFavorite = favoriteIds.includes(idString);
 
-    setFavoriteIds((prevIds) => isCurrentlyFavorite ? prevIds.filter(id => id !== idString) : [...prevIds, idString]);
+    // Logic Value: 
+    // If currently favorite (True) -> User wants to UNLIKE -> Send 0
+    // If currently not favorite (False) -> User wants to LIKE -> Send 1
+    const interactionValue = isCurrentlyFavorite ? 0 : 1; 
+
+    // Optimistic Update (UI)
+    setFavoriteIds((prevIds) => 
+        isCurrentlyFavorite 
+        ? prevIds.filter(id => id !== idString) 
+        : [...prevIds, idString]
+    );
 
     try {
-      await api.post("/api/favorites/toggle/", { shoe_id: idString }, { headers: { Authorization: `Token ${token}` } });
+      // 1. Call Backend API (Database) - CRITICAL
+      // This must succeed. If it fails, it goes to the main 'catch' block.
+      await api.post(
+          "/api/favorites/toggle/", 
+          { shoe_id: idString }, 
+          { headers: { Authorization: `Token ${token}` } }
+      );
       
-      if (!isCurrentlyFavorite && userId) {
-        const feedbackRecs = await sendInteraction(userId, idString, 'like');
-        if (feedbackRecs && feedbackRecs.length > 0) {
-            setRealtimeRecs(feedbackRecs);
+      // 2. --- CALL ML API (INTERACT) - BEST EFFORT ---
+      // We wrap this in its own try-catch so it doesn't break the flow if it fails
+      if (userId) {
+        try {
+            console.log(`[ML] Sending interaction... Value: ${interactionValue}`);
+            
+            // Send interaction to ML
+            const feedbackRecs = await sendInteraction(userId, idString, 'like', interactionValue);
+            
+            // Update realtime recommendations (Only if ML succeeds)
+            if (feedbackRecs && feedbackRecs.length > 0) {
+                setRealtimeRecs(feedbackRecs);
+            }
+            console.log("[ML] Success!");
+
+        } catch (mlErr) {
+            // IF ML FAILS: Log warning only. DO NOT ROLLBACK UI.
+            console.warn("[ML] Failed to send interaction, but Database is safe.", mlErr);
         }
       }
+
     } catch (err) {
-      console.error("Failed to toggle favorite:", err);
-      setFavoriteIds((prevIds) => isCurrentlyFavorite ? [...prevIds, idString] : prevIds.filter(id => id !== idString));
+      // This Catch block ONLY runs if the DATABASE (Step 1) fails.
+      console.error("Failed to toggle favorite (DB Error):", err);
+      
+      // Rollback UI (Undo the heart change)
+      setFavoriteIds((prevIds) => 
+          isCurrentlyFavorite 
+          ? [...prevIds, idString] 
+          : prevIds.filter(id => id !== idString)
+      );
       setError("Failed to sync with server.");
     }
   };

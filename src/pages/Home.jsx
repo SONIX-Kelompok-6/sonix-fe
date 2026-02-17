@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+
+// --- IMPORT SERVICE ML (NEW) ---
+import { getUserFeed } from "../services/SonixMl"; 
 
 // --- IMPORT ASET ---
 import shoeImg from '../assets/home-images/home-shoe.webp'; 
@@ -15,107 +18,108 @@ import toeboxImg from '../assets/home-images/toebox.png';
 import sonixMemberImg from '../assets/home-images/sonix-member.png';
 
 const Home = () => {
+  const navigate = useNavigate();
+  
   // State untuk melacak titik mana yang aktif (Section 2)
   const [activePoint, setActivePoint] = useState(null); 
 
-  // --- STATE & REF UNTUK ANIMASI SCROLL ---
-  // Section 2
-  const [isVisible, setIsVisible] = useState(false);
+  // --- STATE UNTUK FITUR FEED (NEW) ---
+  const [userFeed, setUserFeed] = useState([]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isFeedVisible, setIsFeedVisible] = useState(false);
+  const feedRef = useRef(null);
+
+  // --- STATE & REF UNTUK ANIMASI SCROLL EXISTING ---
+  const [isVisible, setIsVisible] = useState(false); // Parts
   const sectionRef = useRef(null);
 
-  // Section 3 (Compare)
-  const [isSec3Visible, setIsSec3Visible] = useState(false);
+  const [isSec3Visible, setIsSec3Visible] = useState(false); // Compare
   const sec3Ref = useRef(null);
 
-  // Section 4 (About - NEW)
-  const [isAboutVisible, setIsAboutVisible] = useState(false);
+  const [isAboutVisible, setIsAboutVisible] = useState(false); // About
   const aboutRef = useRef(null);
 
-  // Hook untuk mendeteksi scroll
+// --- 1. FETCH FEED DATA (STRICT MODE: MURNI COLLABORATIVE) ---
+  useEffect(() => {
+    const token = localStorage.getItem("userToken");
+    const userId = localStorage.getItem("userId");
+
+    if (token && userId) {
+      setIsLoggedIn(true);
+      
+      const fetchData = async () => {
+        try {
+          console.log("Mencoba ambil feed personal murni...");
+          
+          // 1. Ambil Feed Personal
+          const data = await getUserFeed(userId);
+          
+          // 2. Langsung cek hasil
+          if (data && data.length > 0) {
+            setUserFeed(data.slice(0, 4));
+            console.log("Data Personal ditemukan:", data.length);
+          } else {
+            // KALAU KOSONG, BIARKAN KOSONG (JANGAN PANGGIL REKOMENDASI UMUM)
+            console.log("Feed personal kosong. Section disembunyikan (Strict Mode).");
+            setUserFeed([]); 
+          }
+          
+        } catch (err) {
+          console.error("Gagal load feed:", err);
+          setUserFeed([]); 
+        }
+      };
+      
+      fetchData();
+    }
+  }, []);
+
+  // --- 2. OBSERVER SCROLL (UPDATE UNTUK FEED) ---
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.target === sectionRef.current && entry.isIntersecting) {
-            setIsVisible(true);
-          }
-          if (entry.target === sec3Ref.current && entry.isIntersecting) {
-            setIsSec3Visible(true);
-          }
-          if (entry.target === aboutRef.current && entry.isIntersecting) {
-            setIsAboutVisible(true);
-          }
+          if (entry.target === sectionRef.current && entry.isIntersecting) setIsVisible(true);
+          if (entry.target === sec3Ref.current && entry.isIntersecting) setIsSec3Visible(true);
+          if (entry.target === aboutRef.current && entry.isIntersecting) setIsAboutVisible(true);
+          
+          // Observer untuk Section Feed Baru
+          if (entry.target === feedRef.current && entry.isIntersecting) setIsFeedVisible(true);
         });
       },
-      { threshold: 0.2 }
+      { threshold: 0.15 } 
     );
 
-    // Simpan ref ke variabel lokal untuk cleanup yang aman
-    const currentSectionRef = sectionRef.current;
-    const currentSec3Ref = sec3Ref.current;
-    const currentAboutRef = aboutRef.current;
-
-    if (currentSectionRef) observer.observe(currentSectionRef);
-    if (currentSec3Ref) observer.observe(currentSec3Ref);
-    if (currentAboutRef) observer.observe(currentAboutRef);
+    // Observe element jika ada
+    if (sectionRef.current) observer.observe(sectionRef.current);
+    if (sec3Ref.current) observer.observe(sec3Ref.current);
+    if (aboutRef.current) observer.observe(aboutRef.current);
+    if (feedRef.current) observer.observe(feedRef.current);
 
     return () => {
-      // Cleanup menggunakan variabel lokal
-      if (currentSectionRef) observer.unobserve(currentSectionRef);
-      if (currentSec3Ref) observer.unobserve(currentSec3Ref);
-      if (currentAboutRef) observer.unobserve(currentAboutRef);
       observer.disconnect();
     };
-  }, []);
+  }, [userFeed]); // Re-run observer saat userFeed berubah (karena ref baru muncul)
 
   // DATA BAGIAN SEPATU (Section 2)
   const shoeParts = [
-    {
-      id: 1,
-      title: "HEEL COUNTER",
-      desc: "Rear shoe structure stabilizing and supporting heel.",
-      top: "10%", left: "67%", align: "right", 
-      img: heelImg,
-    },
-    {
-      id: 2,
-      title: "OUTSOLE",
-      desc: "Bottom shoe layer providing grip and durability",
-      top: "58%", left: "39%", align: "right",
-      img: outsoleImg,
-    },
-    {
-      id: 3,
-      title: "MIDSOLE",
-      desc: "Middle shoe layer cushioning impact and energy return",
-      top: "38%", left: "62%", align: "right",
-      img: midsoleImg,
-    },
-    {
-      id: 4,
-      title: "TOE BOX",
-      desc: "Front shoe area providing toe space comfort.",
-      top: "48%", left: "28%", align: "left", 
-      img: toeboxImg
-    }
+    { id: 1, title: "HEEL COUNTER", desc: "Rear shoe structure stabilizing and supporting heel.", top: "10%", left: "67%", align: "right", img: heelImg },
+    { id: 2, title: "OUTSOLE", desc: "Bottom shoe layer providing grip and durability", top: "58%", left: "39%", align: "right", img: outsoleImg },
+    { id: 3, title: "MIDSOLE", desc: "Middle shoe layer cushioning impact and energy return", top: "38%", left: "62%", align: "right", img: midsoleImg },
+    { id: 4, title: "TOE BOX", desc: "Front shoe area providing toe space comfort.", top: "48%", left: "28%", align: "left", img: toeboxImg }
   ];
 
   return (
-    // Update bg-gray-50 ke white atau warna yang sangat muda, selection color disesuaikan
     <div className="w-full bg-white font-sans selection:bg-[#F39422] selection:text-white overflow-x-hidden">
       
       {/* =========================================================================
-          SECTION 1: HERO SECTION
-          Palette: Backgrounds using Brand Blues
+          SECTION 1: HERO SECTION (TIDAK BERUBAH)
       ========================================================================= */}
       <section className="relative w-full min-h-screen relative overflow-hidden">
         <div className="absolute inset-0 w-full h-full z-0 pointer-events-none">
           <svg className="w-full h-full" viewBox="0 0 1340 900" fill="none" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-            {/* Menggunakan Palette: #010038 (Darkest) */}
             <path d="M 950 0 C 350 300 1000 650 0 900 H 1440 V 0 Z" fill="#010038" transform="translate(-40, 10)" />
-            {/* Menggunakan Palette: #293A80 (Mid Blue) */}
             <path d="M 950 0 C 350 300 1000 650 0 900 H 1440 V 0 Z" fill="#293A80" transform="translate(-20, 0)" />
-            {/* Menggunakan Palette: #537EC5 (Light Blue) */}
             <path d="M 990 0 C 350 300 1000 650 0 950 H 1440 V 0 Z" fill="#537EC5" />
           </svg>
         </div>
@@ -123,19 +127,16 @@ const Home = () => {
         <div className="relative z-10 w-full max-w-[1800px] mx-auto grid grid-cols-1 lg:grid-cols-2 min-h-screen items-center px-6 pb-20">
           <div className="pl-4 md:pl-16 lg:pl-2 pt-32 lg:pt-45 z-30 animate-in slide-in-from-left duration-700">
             <div className="relative -mt-68 mb-6">
-                {/* Text Color: #293A80 */}
                 <p className="absolute top-44 left-22 text-[#293A80] font-bold tracking-[0.25em] text-2xl uppercase">WE ARE</p>
                 <div className="flex justify-start -ml-3">
                   <img src={rushLogo} alt="RUSH Logo" className="w-[280px] md:w-[380px] lg:w-[450px] object-contain" />
                 </div>
             </div>
-            {/* Text Color: #010038 (Darkest Blue for reading) */}
             <p className="absolute top-91 left-30 text-[#010038]/80 text-xl leading-relaxed max-w-md font-medium">
               Personalized shoe recommendations <br/>to help you find the perfect match <br/>for every run.
             </p>
             <div className="relative left-20 pt-15">
               <Link to="/recommendation">
-                {/* Button: Main Blue #293A80 to Darkest #010038 on hover */}
                 <button className="bg-[#293A80] text-white px-12 py-4 rounded-full font-bold tracking-widest shadow-2xl hover:bg-[#010038] hover:scale-105 transition transform duration-300 text-base md:text-lg ring-4 ring-[#293A80]/20">
                   TRY NOW
                 </button>
@@ -151,7 +152,6 @@ const Home = () => {
             </div>
             <div className="absolute right-[-1rem] lg:right-[-11rem] top-[45%] -translate-y-1/2 z-20 select-none pointer-events-none">
                <h2 className="text-[100px] md:text-[140px] lg:text-[99px] font-black -rotate-90 tracking-widest flex items-center gap-0 opacity-100 leading-none">
-                  {/* Alternating Text Colors based on Palette */}
                   <span className="text-[#293A80]">R</span>
                   <span className="text-white">U</span>
                   <span className="text-[#293A80]">N</span>
@@ -168,7 +168,6 @@ const Home = () => {
                       <div className="w-24 h-[2px] bg-white/80 relative shadow-sm"><div className="absolute left-0 bottom-0 w-[1px] h-15 bg-white/80 shadow-sm"></div></div>
                       <div className="text-left drop-shadow-md">
                           <p className="text-white text-xs font-bold tracking-[0.2em] uppercase opacity-90 mb-1">FIND YOUR RUSH IN</p>
-                          {/* Accent Color: #F39422 (Orange) for impact */}
                           <p className="text-[#F39422] text-2xl font-black tracking-wider drop-shadow-sm bg-white/10 backdrop-blur-sm px-2 rounded">THE RIGHT SHOES</p>
                       </div>
                   </div>
@@ -178,15 +177,105 @@ const Home = () => {
         </div>
         <div className="absolute bottom-0 left-0 w-full z-20 pointer-events-none">
            <svg viewBox="0 0 1440 160" className="w-full h-auto min-h-[120px]" preserveAspectRatio="none">
-               <path fill="#f8fafc" ></path>
+               {/* Modifikasi kurva sedikit agar nyambung ke section bawahnya */}
+               <path fill={isLoggedIn && userFeed.length > 0 ? "#F8FAFC" : "#F8FAFC"} ></path>
            </svg>
         </div>
       </section>
 
+      {/* =========================================================================
+          SECTION 1.5: PERSONALIZED FEED (SECTION BARU!)
+          Hanya tampil jika user Login & Ada Data Feed dari ML
+      ========================================================================= */}
+      {isLoggedIn && userFeed.length > 0 && (
+        <section 
+            ref={feedRef} 
+            className="relative w-full py-20 bg-slate-50 border-b border-slate-200 overflow-hidden"
+        >
+            <div className="container max-w-7xl mx-auto px-6">
+                {/* Header Section */}
+                <div className={`flex flex-col md:flex-row justify-between items-end mb-12 transition-all duration-1000 ${isFeedVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <span className="w-8 h-[3px] bg-[#F39422]"></span>
+                            <span className="text-[#293A80] font-bold tracking-[0.2em] uppercase text-sm">JUST FOR YOU</span>
+                        </div>
+                        <h2 className="text-4xl md:text-5xl font-black text-[#010038]">
+                            TOP PICKS <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F39422] to-[#E67E22]">TODAY</span>
+                        </h2>
+                    </div>
+                    {/* Link ke halaman Recommendation penuh */}
+                    <Link to="/recommendation" className="hidden md:flex items-center gap-2 text-[#293A80] font-bold hover:text-[#F39422] transition-colors group">
+                        VIEW ALL RECOMMENDATIONS
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                        </svg>
+                    </Link>
+                </div>
+
+                {/* Grid Sepatu (Maksimal 4 item) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {userFeed.map((shoe, index) => (
+                        <div 
+                            key={shoe.id || index}
+                            onClick={() => navigate(`/shoes/id/${shoe.shoe_id || shoe.id}`)} // Navigate ke detail page pake ID string
+                            className={`group bg-white rounded-3xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_rgba(41,58,128,0.15)] border border-slate-100 hover:border-[#537EC5]/30 transition-all duration-500 cursor-pointer flex flex-col items-center relative overflow-hidden
+                                ${isFeedVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'}
+                            `}
+                            style={{ transitionDelay: `${index * 100}ms` }}
+                        >
+                            {/* Decorative Blob di belakang kartu */}
+                            <div className="absolute top-[-50px] right-[-50px] w-32 h-32 bg-[#537EC5]/10 rounded-full blur-2xl group-hover:bg-[#F39422]/10 transition-colors duration-500"></div>
+
+                            {/* Gambar Sepatu */}
+                            <div className="w-full h-40 flex items-center justify-center mb-4 relative z-10">
+                                <img 
+                                    src={shoe.img_url || shoe.img} 
+                                    alt={shoe.name} 
+                                    className="w-full h-full object-contain mix-blend-multiply transform group-hover:scale-110 group-hover:-rotate-6 transition-transform duration-500" 
+                                />
+                            </div>
+
+                            {/* Info Sepatu */}
+                            <div className="w-full text-left relative z-10">
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">{shoe.brand}</p>
+                                <h3 className="text-lg font-bold text-[#010038] leading-tight line-clamp-2 group-hover:text-[#293A80] transition-colors">
+                                    {shoe.name}
+                                </h3>
+                                
+                                <div className="mt-4 flex items-center justify-between">
+                                    {/* Rating Badge */}
+                                    <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg">
+                                        <svg className="w-4 h-4 text-[#F39422]" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+                                        </svg>
+                                        <span className="text-sm font-bold text-slate-700">{shoe.rating > 0 ? shoe.rating : 4.8}</span>
+                                    </div>
+                                    {/* Action Button Kecil */}
+                                    <span className="w-8 h-8 rounded-full bg-[#293A80] flex items-center justify-center text-white group-hover:bg-[#F39422] transition-colors shadow-lg">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                        </svg>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                
+                {/* Mobile View All Button */}
+                <div className="mt-8 flex justify-center md:hidden">
+                    <Link to="/recommendation" className="px-8 py-3 bg-white border border-[#293A80] text-[#293A80] font-bold rounded-full hover:bg-[#293A80] hover:text-white transition-all shadow-sm">
+                        VIEW ALL
+                    </Link>
+                </div>
+            </div>
+        </section>
+      )}
+
 
       {/* =========================================================================
-          SECTION 2: PARTS OF SHOES (INTERACTIVE)
-          Palette: Using lighter shades and accents
+          SECTION 2: PARTS OF SHOES (TIDAK BERUBAH)
       ========================================================================= */}
       <section 
         ref={sectionRef} 
@@ -274,8 +363,7 @@ const Home = () => {
       </section>
 
       {/* =========================================================================
-          SECTION 3: COMPARE FEATURE (RUSH BRAND PALETTE)
-          Palette: Gradient #293A80 -> #010038, Accents #537EC5 & #F39422
+          SECTION 3: COMPARE FEATURE (TIDAK BERUBAH)
       ========================================================================= */}
       <section ref={sec3Ref} className="relative w-full min-h-screen bg-gradient-to-br from-[#293A80] to-[#010038] flex items-center justify-center overflow-hidden py-20 px-6">
         
@@ -345,23 +433,23 @@ const Home = () => {
               </p>
               
               <div className="pt-6">
-                 <Link to="/compare">
-                    <button className="group relative px-10 py-4 bg-white text-[#293A80] font-black rounded-full overflow-hidden shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-all hover:scale-105 hover:shadow-[0_0_50px_rgba(83,126,197,0.4)] cursor-pointer ring-4 ring-transparent hover:ring-[#537EC5]/30">
-                       <span className="relative z-10 flex items-center gap-3">
+                  <Link to="/compare">
+                     <button className="group relative px-10 py-4 bg-white text-[#293A80] font-black rounded-full overflow-hidden shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-all hover:scale-105 hover:shadow-[0_0_50px_rgba(83,126,197,0.4)] cursor-pointer ring-4 ring-transparent hover:ring-[#537EC5]/30">
+                        <span className="relative z-10 flex items-center gap-3">
                           START COMPARING 
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#F39422] transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                           </svg>
-                       </span>
-                    </button>
-                 </Link>
+                        </span>
+                     </button>
+                  </Link>
               </div>
           </div>
         </div>
       </section>
 
       {/* =========================================================================
-          SECTION 4: ABOUT RUSH (CONCEPT: OVERLAPPING CARD)
+          SECTION 4: ABOUT RUSH (TIDAK BERUBAH)
       ========================================================================= */}
       <section 
         ref={aboutRef}
