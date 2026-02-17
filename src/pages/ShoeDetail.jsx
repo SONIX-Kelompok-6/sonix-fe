@@ -13,10 +13,10 @@ export default function ShoeDetail() {
   const [newReview, setNewReview] = useState({ rating: 0, text: "" });
 
   // --- START UPDATE: LOGIC GUEST NAME ---
-  // 1. Cek Token & Email
+  // 1. Ambil data dari LocalStorage
   const token = localStorage.getItem("userToken");
-  const currentUserEmail = localStorage.getItem("userEmail");
-  const storedUserName = localStorage.getItem("userName");
+  const userEmail = localStorage.getItem("userEmail");
+  const userName = localStorage.getItem("userName");
 
   // 2. State untuk menyimpan nama random (dibuat sekali saat komponen mount)
   const [randomGuestName] = useState(() => {
@@ -24,22 +24,25 @@ export default function ShoeDetail() {
     return `Runner_${randomId}`; 
   });
 
-  // 3. Tentukan nama yang dipakai: Kalau login pakai email, kalau tidak pakai randomGuestName
-const currentUserName = (() => {
-    if (!token) return randomGuestName; // Kalau tidak login -> Random Guest
+  // 3. Tentukan nama yang dipakai (Prioritas: Username > Email Depan > Random)
+  const currentUserName = (() => {
+    // A. Kalau tidak login -> Pakai Random Guest
+    if (!token) return randomGuestName; 
 
-    if (storedUserName) return storedUserName; // Kalau ada username -> Pakai Username
+    // B. Kalau ada Username valid di LocalStorage -> PAKAI INI!
+    if (userName && userName !== "null" && userName !== "undefined" && userName.trim() !== "") {
+        return userName; 
+    }
     
-    if (currentUserEmail) {
-        // Kalau cuma ada email -> Ambil nama depan sebelum '@'
-        // Contoh: "shane@gmail.com" -> "shane"
-        const nameFromEmail = currentUserEmail.split('@')[0];
-        // Opsional: Bikin huruf pertama kapital biar rapi
+    // C. Fallback: Kalau Username kosong, ambil nama depan dari email
+    if (userEmail) {
+        const nameFromEmail = userEmail.split('@')[0];
         return nameFromEmail.charAt(0).toUpperCase() + nameFromEmail.slice(1);
     }
 
     return "User"; 
   })();
+  // --- END UPDATE LOGIC ---
 
   useEffect(() => {
     const fetchShoeDetail = async () => {
@@ -108,7 +111,7 @@ const currentUserName = (() => {
 
       const addedReview = {
         id: Date.now(),
-        user: currentUserName, // Akan menggunakan currentUserName yang sudah logic baru
+        user: currentUserName, // Menggunakan logic nama baru
         avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=" + currentUserName,
         date: new Date().toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' }),
         text: newReview.text,
@@ -132,9 +135,7 @@ const currentUserName = (() => {
   };
 
 
-
-
-const handleToggleFavorite = async () => {
+  const handleToggleFavorite = async () => {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId"); 
 
@@ -188,7 +189,7 @@ const handleToggleFavorite = async () => {
       setShoeData({ ...shoeData, isFavorite: previousStatus });
       alert("Something went wrong. Please try again later.");
     }
-};
+  };
 
   // --- ADD TO COMPARE ---
   const handleAddCompare = () => {
@@ -270,7 +271,7 @@ const handleToggleFavorite = async () => {
                   <span className="text-2xl font-bold text-gray-700">{shoeData.rating || 0}</span>
                 </div>
                 <button 
-                  onClick={handleAddCompare} // <--- TAMBAHKAN INI
+                  onClick={handleAddCompare} 
                   className="bg-[#0a0a5c] text-white px-8 py-3 rounded-full font-bold hover:bg-blue-900 transition-colors"
                 >
                   Compare
