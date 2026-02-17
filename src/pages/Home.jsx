@@ -196,21 +196,17 @@ const Home = () => {
                 {/* Header Section */}
                 <div className={`flex flex-col md:flex-row justify-between items-end mb-12 transition-all duration-1000 ${isFeedVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
                     <div>
-                        <div className="flex items-center gap-3 mb-2">
-                            <span className="w-8 h-[3px] bg-[#F39422]"></span>
-                            <span className="text-[#293A80] font-bold tracking-[0.2em] uppercase text-sm">JUST FOR YOU</span>
-                        </div>
                         <h2 className="text-4xl md:text-5xl font-black text-[#010038]">
-                            TOP PICKS <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F39422] to-[#E67E22]">TODAY</span>
+                            YOU MIGHT ALSO <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F39422] to-[#E67E22]">LIKE</span>
                         </h2>
                     </div>
-                    {/* Link ke halaman Recommendation penuh */}
+                    {/* Link ke halaman Recommendation penuh
                     <Link to="/recommendation" className="hidden md:flex items-center gap-2 text-[#293A80] font-bold hover:text-[#F39422] transition-colors group">
                         VIEW ALL RECOMMENDATIONS
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
                         </svg>
-                    </Link>
+                    </Link> */}
                 </div>
 
                 {/* Grid Sepatu (Maksimal 4 item) */}
@@ -218,7 +214,7 @@ const Home = () => {
                     {userFeed.map((shoe, index) => (
                         <div 
                             key={shoe.id || index}
-                            onClick={() => navigate(`/shoes/id/${shoe.shoe_id || shoe.id}`)} // Navigate ke detail page pake ID string
+                            onClick={() => navigate(`/shoe/${shoe.slug}`)}
                             className={`group bg-white rounded-3xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_rgba(41,58,128,0.15)] border border-slate-100 hover:border-[#537EC5]/30 transition-all duration-500 cursor-pointer flex flex-col items-center relative overflow-hidden
                                 ${isFeedVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'}
                             `}
@@ -232,7 +228,7 @@ const Home = () => {
                                 <img 
                                     src={shoe.img_url || shoe.img} 
                                     alt={shoe.name} 
-                                    className="w-full h-full object-contain mix-blend-multiply transform group-hover:scale-110 group-hover:-rotate-6 transition-transform duration-500" 
+                                    className="w-full h-full object-contain mix-blend-multiply transform group-hover:scale-105 transition-transform duration-300"
                                 />
                             </div>
 
@@ -249,7 +245,7 @@ const Home = () => {
                                         <svg className="w-4 h-4 text-[#F39422]" fill="currentColor" viewBox="0 0 24 24">
                                             <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
                                         </svg>
-                                        <span className="text-sm font-bold text-slate-700">{shoe.rating > 0 ? shoe.rating : 4.8}</span>
+                                        <span className="text-sm font-bold text-slate-700">{shoe.rating ? shoe.rating : 0.0}</span>
                                     </div>
                                     {/* Action Button Kecil */}
                                     <span className="w-8 h-8 rounded-full bg-[#293A80] flex items-center justify-center text-white group-hover:bg-[#F39422] transition-colors shadow-lg">
@@ -263,12 +259,12 @@ const Home = () => {
                     ))}
                 </div>
                 
-                {/* Mobile View All Button */}
+                {/* Mobile View All Button
                 <div className="mt-8 flex justify-center md:hidden">
                     <Link to="/recommendation" className="px-8 py-3 bg-white border border-[#293A80] text-[#293A80] font-bold rounded-full hover:bg-[#293A80] hover:text-white transition-all shadow-sm">
                         VIEW ALL
                     </Link>
-                </div>
+                </div> */}
             </div>
         </section>
       )}
