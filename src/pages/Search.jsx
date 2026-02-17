@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom"; // Pastikan Link diimport
-import api from "../api/axios"; 
+import api from "../api/axios";
+import { sendInteraction } from "../services/SonixMl";
 
 export default function Search() {
   const [searchParams] = useSearchParams();
@@ -10,14 +11,22 @@ export default function Search() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // LOGIC LENGKAP DARI DEVELOP
+  // LOGIC LENGKAP DENGAN INTEGRASI ML
   const handleAddFavorite = async (shoe) => {
     const token = localStorage.getItem("userToken");
+    const userId = localStorage.getItem("userId"); // <--- BARU: Ambil User ID untuk ML
 
     if (!token) {
       setError("Please login first to save this shoe to your favorites.");
       return;
     }
+
+    // --- LOGIC BARU UNTUK ML ---
+    // Tentukan value: 
+    // Jika sepatu sedang "isFavorite" (True), berarti user mau UNLIKE -> kirim 0
+    // Jika sepatu belum "isFavorite" (False), berarti user mau LIKE -> kirim 1
+    const interactionValue = shoe.isFavorite ? 0 : 1;
+    // ---------------------------
 
     // 1. Optimistic Update (Ubah UI duluan biar cepet)
     setShoes((prevShoes) =>
@@ -27,18 +36,29 @@ export default function Search() {
     );
 
     try {
-      // 2. Tembak API
+      // 2. Tembak API Backend (Simpan ke Database Django/Supabase)
       await api.post(
         "/api/favorites/toggle/",
-        { shoe_id: String(shoe.shoe_id) }, // Pastikan ID jadi String
+        { shoe_id: String(shoe.shoe_id) }, 
         {
           headers: {
             Authorization: `Token ${token}`,
           },
         }
       );
+
+      // 3. --- TEMBAK API ML (INTERACT) ---
+      // Ini yang bikin feed "You Might Also Like" bekerja
+      if (userId) {
+          console.log(`[ML] Sending interaction: ${shoe.name}, Value: ${interactionValue}`);
+          // Parameter: userId, shoeId, actionType ('like'), value (1 atau 0)
+          await sendInteraction(userId, shoe.shoe_id, 'like', interactionValue);
+      }
+      // -----------------------------------
+
     } catch (err) {
       console.error("Failed to toggle favorite:", err);
+      
       // Kalau gagal, balikin lagi statusnya (Rollback)
       setShoes((prevShoes) =>
         prevShoes.map((s) =>

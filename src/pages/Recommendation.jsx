@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from "react";
 import api from "../api/axios"; 
 import { useNavigate, Link } from "react-router-dom";
-// --- IMPORT SERVICE ML ---
-import { getRecommendations, sendInteraction, getUserFeed } from "../services/SonixMl"; 
+import { getRecommendations, sendInteraction, getUserFeed } from "../services/SonixMl";
+
 
 // --- IMPORT ASSETS ---
 import roadImg from "../assets/recommendation-page/road.png";
@@ -186,29 +186,62 @@ export default function Recommendation() {
     }
   };
 
-  // --- HANDLE ADD FAVORITE (DUAL WRITE) ---
   const handleAddFavorite = async (shoeId) => {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId");
-    if (!token) { setError("Please login to save favorites."); return; }
+    
+    if (!token) { 
+        setError("Please login to save favorites."); 
+        return; 
+    }
 
     const idString = String(shoeId);
     const isCurrentlyFavorite = favoriteIds.includes(idString);
 
-    setFavoriteIds((prevIds) => isCurrentlyFavorite ? prevIds.filter(id => id !== idString) : [...prevIds, idString]);
+    // --- LOGIC BARU ---
+    // Tentukan Value: 
+    // Kalau sekarang Favorite (True) -> Berarti user mau UNLIKE -> Kirim 0
+    // Kalau sekarang Belum (False) -> Berarti user mau LIKE -> Kirim 1
+    const interactionValue = isCurrentlyFavorite ? 0 : 1; 
+    // ------------------
+
+    // Optimistic Update
+    setFavoriteIds((prevIds) => 
+        isCurrentlyFavorite 
+        ? prevIds.filter(id => id !== idString) 
+        : [...prevIds, idString]
+    );
 
     try {
-      await api.post("/api/favorites/toggle/", { shoe_id: idString }, { headers: { Authorization: `Token ${token}` } });
+      // 1. Tembak API Backend
+      await api.post(
+          "/api/favorites/toggle/", 
+          { shoe_id: idString }, 
+          { headers: { Authorization: `Token ${token}` } }
+      );
       
-      if (!isCurrentlyFavorite && userId) {
-        const feedbackRecs = await sendInteraction(userId, idString, 'like');
+      // 2. Tembak API ML (Interact)
+      if (userId) {
+        // HAPUS if (!isCurrentlyFavorite), karena Unlike pun harus lapor
+        console.log(`[ML] Sending interaction. Value: ${interactionValue}`);
+        
+        // Tambahkan parameter ke-4: interactionValue
+        const feedbackRecs = await sendInteraction(userId, idString, 'like', interactionValue);
+        
+        // Update rekomendasi realtime (biasanya muncul pas Like aja, tapi terserah logic UI mu)
         if (feedbackRecs && feedbackRecs.length > 0) {
             setRealtimeRecs(feedbackRecs);
         }
       }
+
     } catch (err) {
       console.error("Failed to toggle favorite:", err);
-      setFavoriteIds((prevIds) => isCurrentlyFavorite ? [...prevIds, idString] : prevIds.filter(id => id !== idString));
+      // Rollback
+      setFavoriteIds((prevIds) => 
+          isCurrentlyFavorite 
+          ? [...prevIds, idString] 
+          : prevIds.filter(id => id !== idString)
+      );
       setError("Failed to sync with server.");
     }
   };

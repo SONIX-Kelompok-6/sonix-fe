@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import Navbar from "../components/Navbar";
 import { FaHeart, FaRegHeart, FaStar, FaPlus } from "react-icons/fa";
-import api from "../api/axios"; 
+import { sendInteraction } from "../services/SonixMl";
+import Navbar from "../components/Navbar";
+import api from "../api/axios";
 
 export default function ShoeDetail() {
   const { slug } = useParams();
@@ -118,15 +119,32 @@ export default function ShoeDetail() {
     }
   };
 
-  const handleToggleFavorite = async () => {
+
+
+// ...
+
+const handleToggleFavorite = async () => {
     const token = localStorage.getItem("userToken");
+    const userId = localStorage.getItem("userId"); // <--- BARU: Ambil User ID
+
     if (!token) {
       alert("Please login first to save this shoe to your favorites.");
       return;
     }
+
     const previousStatus = shoeData.isFavorite;
+    
+    // --- LOGIC BARU UNTUK ML ---
+    // Kalau status sebelumnya True (Favorit), berarti user mau UNLIKE -> kirim 0
+    // Kalau status sebelumnya False (Belum Favorit), berarti user mau LIKE -> kirim 1
+    const interactionValue = previousStatus ? 0 : 1;
+    // ---------------------------
+
+    // Optimistic Update UI
     setShoeData({ ...shoeData, isFavorite: !previousStatus });
+
     try {
+      // 1. Tembak API Backend (Simpan ke DB)
       const response = await api.post(
         "/api/favorites/toggle/",
         { shoe_id: shoeData.shoe_id },
@@ -134,13 +152,26 @@ export default function ShoeDetail() {
           headers: { Authorization: `Token ${token}` },
         }
       );
+      
+      // Update state sesuai balikan server (biar aman)
       setShoeData({ ...shoeData, isFavorite: response.data.is_favorite });
+
+      // 2. --- TEMBAK API ML (INTERACT) ---
+      // Supaya Home Feed langsung update
+      if (userId) {
+          console.log(`[ML] Sending interaction from Detail Page. Value: ${interactionValue}`);
+          // Parameter: userId, shoeId, actionType ('like'), value (1 atau 0)
+          await sendInteraction(userId, shoeData.shoe_id, 'like', interactionValue);
+      }
+      // -----------------------------------
+
     } catch (err) {
       console.error("Failed to update favorite:", err);
+      // Rollback kalau error
       setShoeData({ ...shoeData, isFavorite: previousStatus });
       alert("Something went wrong. Please try again later.");
     }
-  };
+};
 
   if (isLoading) return <div className="flex h-screen items-center justify-center text-white bg-[#4a76a8]">Loading...</div>;
   if (error) return <div className="flex h-screen items-center justify-center text-white bg-[#4a76a8]">{error}</div>;

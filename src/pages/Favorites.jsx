@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { sendInteraction } from "../services/SonixMl";
 import api from "../api/axios"; 
+
 
 export default function Favorites() {
   const [favorites, setFavorites] = useState([]);
@@ -33,25 +35,38 @@ export default function Favorites() {
     fetchFavorites();
   }, []);
 
-  // 2. Fungsi buat hapus dari favorit
+// 2. Fungsi buat hapus dari favorit
   const handleRemoveFavorite = async (e, shoeId) => {
     // Stop propagasi biar pas klik tong sampah, gak kebuka link detail sepatunya
     e.preventDefault();
     e.stopPropagation();
 
     const token = localStorage.getItem("userToken");
-    
+    const userId = localStorage.getItem("userId"); // <--- BARU: Ambil UserId
+
     // Optimistic Update: Hapus dari layar dulu biar kerasa cepet
     const previousFavorites = [...favorites];
     setFavorites((prev) => prev.filter((shoe) => shoe.shoe_id !== shoeId));
 
     try {
+      // 1. Tembak API Backend (Hapus dari DB Favorit)
       await api.post(
         "/api/favorites/toggle/",
         { shoe_id: String(shoeId) },
         { headers: { Authorization: `Token ${token}` } }
       );
+
+      // 2. --- TEMBAK API ML (INTERACT) ---
+      // Kasus: User menghapus favorit -> Artinya UNLIKE -> Value 0
+      if (userId) {
+          console.log(`[ML] Removing favorite (Unlike). ShoeID: ${shoeId}, Value: 0`);
+          // Parameter: userId, shoeId, actionType ('like'), value (0)
+          await sendInteraction(userId, shoeId, 'like', 0);
+      }
+      // -----------------------------------
+
     } catch (err) {
+      console.error("Gagal hapus favorit:", err);
       // Kalau gagal, balikin lagi datanya (Rollback)
       setFavorites(previousFavorites);
       alert("Failed to remove favorite. Check your connection.");
