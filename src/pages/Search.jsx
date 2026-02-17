@@ -1,98 +1,144 @@
 import { useEffect, useState } from "react";
-import { useSearchParams, Link } from "react-router-dom"; // Pastikan Link diimport
+import { useSearchParams, Link } from "react-router-dom"; 
 import api from "../api/axios";
 import { sendInteraction } from "../services/SonixMl";
 
 export default function Search() {
   const [searchParams] = useSearchParams();
-  const query = searchParams.get("q");
+  const query = searchParams.get("q") || ""; // Default string kosong
 
-  const [shoes, setShoes] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  // --- STATE ---
+  const [allShoes, setAllShoes] = useState([]); // Master Data (Database Mini di Browser)
+  const [shoes, setShoes] = useState([]);       // Data yang Tampil (Hasil Filter)
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // LOGIC LENGKAP DENGAN INTEGRASI ML
- const handleAddFavorite = async (shoe) => {
+  // --- 1. FETCH SEMUA DATA SEKALI SAJA (SAAT HALAMAN DIBUKA) ---
+  useEffect(() => {
+    const fetchAllData = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const token = localStorage.getItem("userToken");
+
+        // UBAH ENDPOINT: Ambil List Semua Sepatu (/api/shoes/)
+        // Bukan endpoint search. Kita download semua di awal.
+        const response = await api.get("/api/shoes/", {
+          headers: token ? { Authorization: `Token ${token}` } : {},
+        });
+        
+        // Handle format data (array langsung atau pagination .results)
+        const data = response.data;
+        const results = Array.isArray(data) ? data : (data.results || []);
+        
+        // Mapping untuk safety properti isFavorite
+        const safeData = results.map(shoe => ({
+           ...shoe,
+           isFavorite: shoe.isFavorite || false
+        }));
+
+        setAllShoes(safeData); // Simpan ke Master
+        //setShoes(safeData);    // Tampilkan semua di awal
+
+      } catch (err) {
+        console.error("Error fetching database:", err);
+        setError("Failed to load shoes database.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAllData();
+  }, []); // Dependency Kosong [] = Jalan Sekali Seumur Hidup
+
+
+  // --- 2. LOGIC FILTERING INSTANT ---
+  // Jalan setiap kali 'query' berubah atau database 'allShoes' siap
+  useEffect(() => {
+    // Kalau database belum siap, jangan ngapa-ngapain
+    if (allShoes.length === 0) return;
+
+    if (!query) {
+      setShoes([]); // Kalau search bar kosong, tampilkan semua
+      return;
+    }
+
+    const lowerQuery = query.toLowerCase();
+
+    // FILTERING DI CLIENT (CEPAT) 
+    const filtered = allShoes.filter((shoe) => {
+      const nameMatch = shoe.name && shoe.name.toLowerCase().includes(lowerQuery);
+      const brandMatch = shoe.brand && shoe.brand.toLowerCase().includes(lowerQuery);
+      return nameMatch || brandMatch;
+    });
+
+    setShoes(filtered);
+  }, [query, allShoes]);
+
+
+  // --- HANDLERS ---
+  const handleAddFavorite = async (shoe) => {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId"); 
 
     if (!token) {
-      setError("Please login first to save this shoe to your favorites.");
+      alert("Please login first to save this shoe to your favorites.");
       return;
     }
 
-    // Logic Value (1 = Like, 0 = Unlike)
     const interactionValue = shoe.isFavorite ? 0 : 1;
 
-    // 1. Optimistic Update (Update UI first)
-    setShoes((prevShoes) =>
-      prevShoes.map((s) =>
+    // Helper function untuk update state
+    const toggleFavInList = (list) => list.map((s) => 
         s.shoe_id === shoe.shoe_id ? { ...s, isFavorite: !s.isFavorite } : s
-      )
     );
 
-    try {
-      // 2. Call Backend API (Database) - MUST SUCCEED
-      await api.post(
-        "/api/favorites/toggle/",
-        { shoe_id: String(shoe.shoe_id) }, 
-        {
-          headers: { Authorization: `Token ${token}` },
-        }
-      );
+    // 1. Optimistic Update (Update Master & Tampilan sekaligus biar sinkron)
+    setAllShoes((prev) => toggleFavInList(prev));
+    setShoes((prev) => toggleFavInList(prev));
 
-      // 3. --- CALL ML API (INTERACT) ---
-      // Wrapped in its own try-catch so it doesn't affect the main flow
+    try {
+      await api.post("/api/favorites/toggle/", { shoe_id: String(shoe.shoe_id) }, {
+        headers: { Authorization: `Token ${token}` },
+      });
+
       if (userId) {
           try {
-             console.log(`[ML] Sending interaction...`);
              await sendInteraction(userId, shoe.shoe_id, 'like', interactionValue);
-             console.log("[ML] Success!");
           } catch (mlErr) {
-              // IF ML FAILS: Just log a warning.
-              // DO NOT throw error, so the function continues as success.
-              console.warn("[ML] Failed to send interaction, but Database is safe.", mlErr);
+             console.warn("[ML] Failed log.", mlErr);
           }
       }
-      // -----------------------------------
-
     } catch (err) {
-      // This Catch block ONLY runs if the DATABASE (Step 2) fails.
-      console.error("Failed to toggle favorite (DB Error):", err);
-      
-      // Rollback UI (Revert heart color)
-      setShoes((prevShoes) =>
-        prevShoes.map((s) =>
-          s.shoe_id === shoe.shoe_id ? { ...s, isFavorite: !s.isFavorite } : s
-        )
-      );
-      setError("Failed to update favorite status. Please try again.");
+      console.error("Failed toggle:", err);
+      // Rollback UI
+      setAllShoes((prev) => toggleFavInList(prev));
+      setShoes((prev) => toggleFavInList(prev));
+      alert("Failed to update favorite status.");
     }
   };
 
-  // --- 2. ADD TO COMPARE (VERSI SUPER BERSIH) ---
   const handleAddCompare = (shoe) => {
     let compareList = JSON.parse(localStorage.getItem("compareList")) || [];
 
-    // Cek Duplikat
     if (compareList.some((item) => item.shoe_id === shoe.shoe_id)) {
       alert(`"${shoe.name}" is already in comparison list!`);
       return;
     }
 
-    // Cek Limit
     if (compareList.length >= 5) {
       alert("Max 5 shoes allowed!");
       return;
     }
 
-    // SIMPAN APA ADANYA DARI BACKEND 
-    // Karena backend sekarang udah ngasih 'weight_lab_oz', 'drop_lab_mm', dll,
-    // kita simpan mentah-mentah aja. Gak usah mapping manual lagi.
+    // SIMPAN APA ADANYA (Backend sudah Royal)
     const shoeToSave = { 
         ...shoe,
-        // Pastikan fallback image tersimpan kalau img_url kosong dari backend
-        img_url: shoe.img_url || "https://via.placeholder.com/300x200?text=No+Image" 
+        // Standarisasi field
+        name: shoe.name || shoe.model,
+        img_url: shoe.img_url || shoe.mainImage || "https://via.placeholder.com/300x200?text=No+Image",
+        slug: shoe.slug // Pastikan slug terbawa
     };
 
     compareList.push(shoeToSave);
@@ -101,42 +147,7 @@ export default function Search() {
     alert(`Added "${shoe.name}" to comparison!`);
   };
 
-  useEffect(() => {
-    if (!query) return;
-
-    const fetchSearchResults = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        // AMBIL TOKEN DULU
-        const token = localStorage.getItem("userToken");
-
-        const response = await api.get(
-          `/api/shoes/search/?q=${query}`,
-          {
-            // PENTING: Kirim token biar Backend tau mana yang udah dilike
-            headers: token ? { Authorization: `Token ${token}` } : {},
-          }
-        );
-        
-        // Mapping data biar aman
-        const dataWithFavorites = response.data.map(shoe => ({
-          ...shoe,
-          isFavorite: shoe.isFavorite || false
-        }));
-        setShoes(dataWithFavorites);
-      } catch (err) {
-        console.error("Error fetching search results:", err);
-        setError("Failed to fetch data from the server. Ensure Django is running.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchSearchResults();
-  }, [query]);
-
+  // --- RENDER ---
   return (
     <div className="max-w-6xl mx-auto px-6 pb-12">
       <div className="mb-8 border-b pb-4">
@@ -144,13 +155,15 @@ export default function Search() {
           Search Results for <span className="text-blue-600">"{query}"</span>
         </h1>
         <p className="text-gray-500 text-sm mt-1">
-          Showing shoe search results based on the keyword.
+          {/* Tampilkan status loading atau jumlah hasil */}
+          {isLoading ? "Loading database..." : `Found ${shoes.length} result(s).`}
         </p>
       </div>
 
       {isLoading && (
         <div className="flex justify-center items-center py-20">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-gray-500">Loading Shoe Database...</span>
         </div>
       )}
 
@@ -160,7 +173,7 @@ export default function Search() {
         </div>
       )}
 
-      {!isLoading && !error && shoes.length === 0 && query && (
+      {!isLoading && !error && shoes.length === 0 && (
         <div className="text-center py-20 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 mx-auto text-gray-400 mb-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -175,7 +188,7 @@ export default function Search() {
           {shoes.map((shoe) => (
             <Link 
               to={`/shoe/${shoe.slug}`} 
-              key={shoe.shoe_id} // Pastikan pake shoe_id
+              key={shoe.shoe_id} 
               className="group relative bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col cursor-pointer"
             >
               <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 translate-x-2 group-hover:translate-x-0">
@@ -211,7 +224,6 @@ export default function Search() {
               </div>
 
               <div className="h-56 bg-gray-50 p-6 flex justify-center items-center relative overflow-hidden">
-                {/* PASTIKAN INI PAKE image_url (atau img_url sesuai database lu) */}
                 <img 
                   src={shoe.image_url || shoe.img_url || "https://via.placeholder.com/300x200?text=No+Image"} 
                   alt={shoe.name} 
