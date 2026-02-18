@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSearchParams, Link, useNavigate } from "react-router-dom"; 
 import api from "../api/axios";
 import { sendInteraction } from "../services/SonixMl";
@@ -12,14 +12,33 @@ export default function Search() {
   // AMBIL DATA DARI CONTEXT
   const { allShoes, isLoading: contextLoading, error, updateShoeState } = useShoes(); 
 
-  const [sortBy, setSortBy] = useState("relevance"); // State Sorting
+  const [sortBy, setSortBy] = useState("relevance"); 
+  
+  // 🔥 STATE NOTIFIKASI
+  const [notification, setNotification] = useState(null);
+
+  // --- LOGIC TIMER PINTAR (AUTO RESET) ---
+  useEffect(() => {
+    if (notification) {
+      // Set timer untuk hilangkan notif
+      const timer = setTimeout(() => {
+        setNotification(null);
+      }, 3000);
+
+      // CLEANUP: Kalau ada notif baru sebelum 3 detik, timer lama DIMATIKAN
+      return () => clearTimeout(timer);
+    }
+  }, [notification]); // Jalan setiap kali 'notification' berubah
+
+  // --- HELPER ---
+  const showNotification = (message) => {
+    setNotification(message); // Cukup set state, useEffect yang urus timer
+  };
 
   // --- LOGIC FILTERING & SORTING ---
-  // useMemo akan hitung ulang SECARA INSTAN setiap kali 'sortBy' atau 'query' berubah
   const filteredAndSortedShoes = useMemo(() => {
     if (!allShoes) return [];
 
-    // 1. Filter berdasarkan keyword
     let results = [];
     if (query) {
         const lowerQuery = query.toLowerCase();
@@ -30,21 +49,16 @@ export default function Search() {
         });
     }
 
-    // 2. Sorting Logic (Dilakukan pada hasil filter)
-    // Kita copy array dulu [...results] biar data asli gak keacak
     const sortedResults = [...results];
-
     if (sortBy === "lowHigh") {
       sortedResults.sort((a, b) => (Number(a.weight_lab_oz) || 999) - (Number(b.weight_lab_oz) || 999));
     } else if (sortBy === "highLow") {
       sortedResults.sort((a, b) => (Number(b.weight_lab_oz) || 0) - (Number(a.weight_lab_oz) || 0));
     }
-    // "relevance" biarkan default
 
     return sortedResults;
   }, [query, allShoes, sortBy]);
 
-  // Loading cuma bergantung sama data awal Context
   const isLoading = contextLoading;
 
   // --- HANDLER FAVORITE ---
@@ -53,18 +67,22 @@ export default function Search() {
     const userId = localStorage.getItem("userId"); 
 
     if (!token) {
-      alert("Please login first to save this shoe to your favorites.");
+      // showNotification("Please login to save favorites."); // Opsional: kasih tau dulu sblm redirect
+      navigate('/login'); 
       return;
     }
 
     const interactionValue = shoe.isFavorite ? 0 : 1;
+    const isNowFavorite = !shoe.isFavorite;
 
-    // UPDATE GLOBAL STATE (Context)
+    // UPDATE GLOBAL STATE
     const updatedList = allShoes.map((s) => 
-      s.shoe_id === shoe.shoe_id ? { ...s, isFavorite: !s.isFavorite } : s
+      s.shoe_id === shoe.shoe_id ? { ...s, isFavorite: isNowFavorite } : s
     );
-    
     updateShoeState(updatedList); 
+    
+    // 🔥 Show Notification
+    showNotification(isNowFavorite ? "Added to Favorites ❤️" : "Removed from Favorites 💔");
 
     try {
       await api.post("/api/favorites/toggle/", { shoe_id: String(shoe.shoe_id) }, {
@@ -72,12 +90,12 @@ export default function Search() {
       });
 
       if (userId) {
-          sendInteraction(userId, shoe.shoe_id, 'like', interactionValue).catch(console.warn);
+          try { await sendInteraction(userId, shoe.shoe_id, 'like', interactionValue); } catch (mlErr) { console.warn(mlErr); }
       }
     } catch (err) {
       console.error("Failed toggle:", err);
       updateShoeState(allShoes); // Rollback
-      alert("Failed to update favorite status.");
+      showNotification("Failed to update favorite status.");
     }
   };
 
@@ -85,13 +103,15 @@ export default function Search() {
   const handleAddCompare = (shoe) => {
     let compareList = JSON.parse(localStorage.getItem("compareList")) || [];
 
+    // Cek Duplikat
     if (compareList.some((item) => item.shoe_id === shoe.shoe_id)) {
-      alert(`"${shoe.name}" is already in comparison list!`);
+      showNotification(`"${shoe.name}" is already in comparison list!`);
       return;
     }
 
+    // Cek Penuh
     if (compareList.length >= 5) {
-      alert("Max 5 shoes allowed!");
+      showNotification("Comparison list is full (Max 5).");
       return;
     }
 
@@ -105,12 +125,13 @@ export default function Search() {
     compareList.push(shoeToSave);
     localStorage.setItem("compareList", JSON.stringify(compareList));
 
-    alert(`Added "${shoe.name}" to comparison!`);
+    // 🔥 Show Success Notification
+    showNotification(`Added "${shoe.name}" to comparison.`);
   };
 
   // --- RENDER ---
   return (
-    <div className="max-w-6xl mx-auto px-6 pt-32 pb-12 font-sans min-h-screen">
+    <div className="max-w-6xl mx-auto px-6 pt-32 pb-12 font-sans min-h-screen relative">
       
       {/* HEADER SECTION */}
       <div className="flex flex-col md:flex-row justify-between items-end mb-8 border-b pb-4 gap-4">
@@ -119,7 +140,7 @@ export default function Search() {
             Search Results for <span className="text-blue-600">"{query}"</span>
           </h1>
           <p className="text-gray-500 text-sm mt-1">
-            {isLoading ? "Loading database..." : `Found ${filteredAndSortedShoes.length} result(s).`}
+            {isLoading ? "Searching..." : `Found ${filteredAndSortedShoes.length} result(s).`}
           </p>
         </div>
 
@@ -137,15 +158,13 @@ export default function Search() {
                   <option value="highLow">Weight: Heaviest to Lightest</option>
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
-                  <svg className="h-3 w-3 fill-current" viewBox="0 0 20 20">
-                    <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" fillRule="evenodd" />
-                  </svg>
+                  <svg className="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" fillRule="evenodd" /></svg>
                 </div>
              </div>
         </div>
       </div>
 
-      {/* LOADING STATE (Hanya muncul saat download database awal) */}
+      {/* LOADING STATE */}
       {isLoading && (
         <div className="flex justify-center items-center py-20">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
@@ -228,7 +247,7 @@ export default function Search() {
                 <p className="text-xs text-blue-600 font-bold uppercase tracking-widest mb-1">{shoe.brand || "Brand"}</p>
                 <h3 className="font-bold text-gray-800 text-base mb-3 line-clamp-2 leading-snug">{shoe.name}</h3>
                 
-                {/* Weight Indicator (Optional) */}
+                {/* Weight Indicator */}
                 <div className="mt-auto flex items-center gap-2 text-xs font-bold text-gray-400">
                     <span>⚖️ {shoe.weight_lab_oz || "-"} oz</span>
                 </div>
@@ -237,6 +256,12 @@ export default function Search() {
           ))}
         </div>
       )}
+
+      {/* 🔥 TOAST NOTIFICATION COMPONENT 🔥 */}
+      <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-3 transition-all duration-300 ${notification ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
+        <span className="text-sm font-bold">{notification}</span>
+      </div>
+
     </div>
   );
 }
