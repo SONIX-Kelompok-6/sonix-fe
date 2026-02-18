@@ -313,7 +313,7 @@ const Home = () => {
       {/* =========================================================================
           SECTION 2: PARTS OF SHOES
       ========================================================================= */}
-<section 
+      <section 
         ref={sectionRef} 
         className="relative w-full min-h-[100vh] md:min-h-[120vh] bg-slate-50 flex items-center justify-center overflow-hidden py-16 md:py-24">
         
@@ -377,40 +377,67 @@ const Home = () => {
                              <span className={`relative inline-flex rounded-full transition-all duration-300 border-2 shadow-lg ${activePoint === part.id ? 'h-5 w-5 bg-[#F39422] border-white ring-4 ring-[#F39422]/30' : 'h-4 w-4 bg-white border-[#537EC5] group-hover:scale-125'}`}></span>
                         </div>
 
-                        {/* Tooltip Popup */}
-                        {activePoint === part.id && (
-                            <div 
-                                className={`absolute top-1/2 -translate-y-1/2 flex items-center cursor-default w-[85vw] max-w-[320px] md:w-[400px] md:max-w-[400px] z-[60] 
-                                ${part.align === 'left' 
-                                    ? 'flex-row right-6 justify-end' // Desktop Left Align
-                                    : 'flex-row-reverse left-6 justify-end' // Desktop Right Align
-                                }
-                                md:${part.align === 'left' ? 'right-6' : 'left-6'}
-                                `}
-                                // Logika di atas: Di mobile, kita mungkin butuh penyesuaian posisi agar tidak off-screen, 
-                                // tapi untuk amannya saya pertahankan logic align user dengan lebar responsif.
-                                onClick={(e) => e.stopPropagation()} 
-                            >
-                                <div className={`bg-white/95 backdrop-blur-md p-2 rounded-[2rem] shadow-2xl border border-white/50 animate-in fade-in zoom-in duration-300 flex items-center gap-3 md:gap-4 w-full ${part.align === 'left' ? 'flex-row' : 'flex-row-reverse text-right'}`}>
-                                    
-                                    {/* Text Content */}
-                                    <div className="flex flex-col justify-center flex-1 min-w-0 px-2">
-                                        <h3 className="text-[#F39422] font-black text-base md:text-xl uppercase leading-none mb-1 break-words">{part.title}</h3>
-                                        <p className="text-[#010038]/70 text-[10px] md:text-xs font-medium leading-snug w-full">{part.desc}</p>
-                                    </div>
+                  {/* Tooltip Popup */}
+                  {activePoint === part.id && (
+                      <div 
+                          className={`
+                              /* --- MOBILE (Default): Fixed Bottom Sheet --- */
+                              fixed bottom-6 left-4 right-4 z-[100] w-auto
+                              flex items-center justify-center
 
-                                    {/* Image Thumb */}
-                                    <div className="w-16 h-16 md:w-24 md:h-24 rounded-full border-4 border-white shadow-lg overflow-hidden bg-gray-100 relative shrink-0">
-                                        <img src={part.img} alt={part.title} className="w-full h-full object-cover" />
-                                    </div>
-                                </div>
-                                
-                                {/* Connector Line */}
-                                <div className="hidden md:block w-8 md:w-16 h-[2px] bg-[#F39422] relative mx-2 shrink-0">
-                                     <div className={`absolute w-1.5 h-1.5 bg-[#F39422] rounded-full top-1/2 -translate-y-1/2 ${part.align === 'left' ? '-left-1' : '-right-1'}`}></div>
-                                </div>
-                            </div>
-                        )}
+                              /* --- DESKTOP (md): Reset Mobile Styles & Apply Absolute --- */
+                              md:absolute md:inset-auto md:w-[400px] md:h-auto md:z-50
+                              md:top-1/2 md:-translate-y-1/2
+                              
+                              /* --- LOGIKA POSISI DESKTOP --- */
+                              /* Jika align left: Muncul di SEBELAH KIRI titik */
+                              /* Jika align right: Muncul di SEBELAH KANAN titik */
+                              ${part.align === 'left' 
+                                  ? 'md:right-full md:mr-4 md:justify-end' 
+                                  : 'md:left-full md:ml-4 md:justify-start'
+                              }
+                          `}
+                          onClick={(e) => e.stopPropagation()} 
+                      >
+                          <div className={`
+                              bg-white/95 backdrop-blur-md shadow-2xl border border-white/50 
+                              animate-in fade-in slide-in-from-bottom-2 zoom-in-95 duration-300 
+                              flex items-center w-full
+                              
+                              /* Styling Container */
+                              p-3 rounded-xl gap-3
+                              md:p-2 md:rounded-[2rem] md:gap-4
+
+                              /* Flex Direction: Mobile selalu Row, Desktop ikut Align */
+                              flex-row text-left
+                              md:${part.align === 'left' ? 'flex-row' : 'flex-row-reverse text-right'}
+                          `}>
+                              
+                              {/* Text Content */}
+                              <div className="flex flex-col justify-center flex-1 min-w-0 px-1 md:px-2">
+                                  <h3 className="text-[#F39422] font-black text-sm md:text-xl uppercase leading-none mb-1 break-words">
+                                      {part.title}
+                                  </h3>
+                                  <p className="text-[#010038]/80 text-[11px] md:text-xs font-medium leading-snug w-full">
+                                      {part.desc}
+                                  </p>
+                              </div>
+
+                              {/* Image Thumb */}
+                              <div className="shrink-0 relative">
+                                  <div className="w-14 h-14 md:w-24 md:h-24 rounded-lg md:rounded-full border-2 md:border-4 border-white shadow-lg overflow-hidden bg-gray-100">
+                                      <img src={part.img} alt={part.title} className="w-full h-full object-cover" />
+                                  </div>
+                              </div>
+                          </div>
+                          
+                          {/* Connector Line (Hanya muncul di Desktop) */}
+                          {/* Kita sembunyikan total di mobile (hidden), muncul di desktop (md:block) */}
+                          <div className={`hidden md:block w-8 md:w-16 h-[2px] bg-[#F39422] relative mx-2 shrink-0 ${part.align === 'left' ? 'order-last' : 'order-first'}`}>
+                              <div className={`absolute w-1.5 h-1.5 bg-[#F39422] rounded-full top-1/2 -translate-y-1/2 ${part.align === 'left' ? '-left-1' : '-right-1'}`}></div>
+                          </div>
+                      </div>
+                  )}
                     </div>
                 ))}
             </div>
