@@ -4,7 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { getRecommendations, sendInteraction, getUserFeed } from "../services/SonixMl";
 import { useShoes } from "../context/ShoeContext"; 
 
-// --- IMPORT ASSETS ---
+// --- IMPORT ASSETS (TETAP SAMA) ---
 import roadImg from "../assets/recommendation-page/road.png";
 import trailImg from "../assets/recommendation-page/trail.png";
 import imgNarrow from '../assets/profile-images/foot-narrow.svg';
@@ -22,7 +22,6 @@ const capitalizeFirst = (str) => {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 };
 
-// Style Objek untuk Grid Halus
 const gridStyle = {
   backgroundColor: "#f9fafb",
   backgroundImage: `
@@ -34,7 +33,7 @@ const gridStyle = {
 
 export default function Recommendation() {
   const navigate = useNavigate();
-  const { allShoes, isLoading: isContextLoading } = useShoes();
+  const { allShoes, updateShoeState, isLoading: isContextLoading } = useShoes();
 
   const [step, setStep] = useState("menu"); 
   const [showMore, setShowMore] = useState(false);
@@ -54,6 +53,43 @@ export default function Recommendation() {
 
   const prefetchRef = useRef(null);
 
+  // 🔥 1. RESTORE STATE SAAT PAGE DIMUAT (LOGIC BARU)
+  useEffect(() => {
+    try {
+      const savedState = sessionStorage.getItem("rush_rec_state");
+      if (savedState) {
+        const parsed = JSON.parse(savedState);
+        // Restore data
+        setCommonData(parsed.commonData);
+        setRoadData(parsed.roadData);
+        setTrailData(parsed.trailData);
+        setSearchResults(parsed.results || []);
+        
+        // Restore step dengan aman
+        if (parsed.step === 'results') {
+            setStep('results');
+        } else if (parsed.step === 'road' || parsed.step === 'trail') {
+            setStep(parsed.step);
+        }
+      }
+    } catch (e) {
+      console.warn("Gagal restore state", e);
+    }
+  }, []);
+
+  // --- HELPER SAVE STATE ---
+  const saveStateToStorage = (currentStep, results = searchResults) => {
+    const stateToSave = {
+        step: currentStep,
+        results: results,
+        commonData,
+        roadData,
+        trailData
+    };
+    sessionStorage.setItem("rush_rec_state", JSON.stringify(stateToSave));
+  };
+
+  // --- HYBRID FEED (TETAP SAMA) ---
   useEffect(() => {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId");
@@ -74,7 +110,7 @@ export default function Recommendation() {
                       String(s.id) === String(targetId)
                   );
                }).filter(Boolean);
-               setSearchResults(hydratedFeed.length > 0 ? hydratedFeed : []);
+               setRealtimeRecs(hydratedFeed); 
             }
           } catch (err) { console.error("Feed error:", err); }
         };
@@ -83,6 +119,7 @@ export default function Recommendation() {
     }
   }, [allShoes.length]);
 
+  // --- FETCH FAVORITES SAAT MOUNT (TETAP SAMA) ---
   useEffect(() => {
     const fetchUserFavorites = async () => {
       const token = localStorage.getItem("userToken");
@@ -149,6 +186,7 @@ export default function Recommendation() {
     return hydratedResults;
   };
 
+  // --- AUTO PREFETCH (TETAP SAMA + SAVE STATE) ---
   useEffect(() => {
     const valid = isFormValid();
     if (valid && !prefetchRef.current && !loading && !error && !isContextLoading) {
@@ -156,6 +194,10 @@ export default function Recommendation() {
            console.warn("Silent prefetch failed", err);
            return null;
        });
+    }
+    // Simpan state input biar ga ilang kalau refresh
+    if (step !== 'menu' && step !== 'results') {
+        saveStateToStorage(step, []);
     }
   }, [commonData, roadData, trailData, step]); 
 
@@ -175,15 +217,21 @@ export default function Recommendation() {
       } else {
           results = await performFetch(); 
       }
-      setSearchResults(results || []);
+      const finalResults = results || [];
+      setSearchResults(finalResults);
       setError(null);
       setStep("results");
+      
+      // 🔥 2. SIMPAN HASIL KE STORAGE SAAT SUKSES
+      saveStateToStorage("results", finalResults);
+
     } catch (err) {
       setError("AI Engine is busy. Please try again.");
       prefetchRef.current = null;
     } finally { setLoading(false); }
   };
 
+  // --- HANDLERS LAIN (TETAP SAMA) ---
   const handleUseProfile = async () => {
     const token = localStorage.getItem("userToken");
     if (!token) { setError("Please login to use profile."); return; }
@@ -194,10 +242,10 @@ export default function Recommendation() {
       const userProfile = response.data.profile || response.data;
       let mappedArch = null;
       if (userProfile.arch_type) {
-          const archLower = userProfile.arch_type.toLowerCase();
-          if (archLower.includes("flat")) mappedArch = "Flat";
-          else if (archLower.includes("high")) mappedArch = "High";
-          else mappedArch = "Normal";
+         const archLower = userProfile.arch_type.toLowerCase();
+         if (archLower.includes("flat")) mappedArch = "Flat";
+         else if (archLower.includes("high")) mappedArch = "High";
+         else mappedArch = "Normal";
       }
       let mappedWidth = null;
       if (userProfile.foot_width) mappedWidth = capitalizeFirst(userProfile.foot_width.trim());
@@ -212,14 +260,28 @@ export default function Recommendation() {
     if (!token) { setError("Please login to save favorites."); return; }
     const idString = String(shoeId);
     const isCurrentlyFavorite = favoriteIds.includes(idString);
-    const interactionValue = isCurrentlyFavorite ? 0 : 1; 
+    const newStatus = !isCurrentlyFavorite; 
     setFavoriteIds((prevIds) => isCurrentlyFavorite ? prevIds.filter(id => id !== idString) : [...prevIds, idString]);
+    
+    // Update Context Global
+    if (allShoes.length > 0) {
+        const updatedGlobalList = allShoes.map(shoe => {
+            if (String(shoe.shoe_id) === idString || String(shoe.id) === idString) {
+                return { ...shoe, isFavorite: newStatus };
+            }
+            return shoe;
+        });
+        updateShoeState(updatedGlobalList);
+    }
+
     try {
+      const interactionValue = newStatus ? 1 : 0;
       const favPromise = api.post("/api/favorites/toggle/", { shoe_id: idString }, { headers: { Authorization: `Token ${token}` } });
       if (userId) sendInteraction(userId, idString, 'like', interactionValue).catch(console.warn);
       await favPromise; 
     } catch (err) {
       setFavoriteIds((prevIds) => isCurrentlyFavorite ? [...prevIds, idString] : prevIds.filter(id => id !== idString));
+      updateShoeState(allShoes); 
       setError("Failed to sync with server.");
     }
   };
@@ -297,12 +359,30 @@ export default function Recommendation() {
           )}
           <h2 className="text-center font-bold tracking-[0.1em] mb-8 text-gray-800 text-xl uppercase">Types of Running</h2>
           <div className="flex flex-col md:flex-row gap-6 w-full px-2">
-            <div onClick={() => { if(!error && !isContextLoading) { setStep("road"); setShowMore(false); } }} className={`relative flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-64 ${(error || isContextLoading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`}>
+            <div 
+                onClick={() => { 
+                    if(!error && !isContextLoading) { 
+                        setStep("road"); 
+                        setShowMore(false); 
+                        // 🔥 3. RESET STORAGE KALAU MULAI DARI AWAL
+                        sessionStorage.removeItem("rush_rec_state");
+                    } 
+                }} 
+                className={`relative flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-64 ${(error || isContextLoading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`}>
               <img src={roadImg} alt="Road" className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out ${(!error && !isContextLoading) && 'group-hover:scale-110'}`} />
               <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors duration-300"></div>
               <div className="absolute inset-0 flex items-center justify-center z-10"><span className="text-white text-4xl md:text-5xl font-bold tracking-[0.25em] uppercase drop-shadow-lg text-center px-4">ROAD</span></div>
             </div>
-            <div onClick={() => { if(!error && !isContextLoading) { setStep("trail"); setShowMore(false); } }} className={`relative flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-64 ${(error || isContextLoading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`}>
+            <div 
+                onClick={() => { 
+                    if(!error && !isContextLoading) { 
+                        setStep("trail"); 
+                        setShowMore(false); 
+                        // 🔥 3. RESET STORAGE KALAU MULAI DARI AWAL
+                        sessionStorage.removeItem("rush_rec_state");
+                    } 
+                }} 
+                className={`relative flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-64 ${(error || isContextLoading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`}>
               <img src={trailImg} alt="Trail" className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out ${(!error && !isContextLoading) && 'group-hover:scale-110'}`} />
               <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors duration-300"></div>
               <div className="absolute inset-0 flex items-center justify-center z-10"><span className="text-white text-4xl md:text-5xl font-bold tracking-[0.25em] uppercase drop-shadow-lg text-center px-4">TRAIL</span></div>
@@ -321,6 +401,7 @@ export default function Recommendation() {
            <div className="max-w-6xl mx-auto">
                <div className="flex flex-col gap-4 mb-6">
                  <div className="flex items-center gap-4">
+                   {/* BUTTON BACK DISINI TETAP BALIK KE FORM (NORMAL) */}
                    <button onClick={() => setStep(roadData.purpose ? "road" : "trail")} className="text-sm font-bold text-gray-400 hover:text-blue-600 bg-white/50 px-3 py-1 rounded-full">← BACK</button>
                    <h1 className="text-2xl font-serif font-bold text-gray-800">Recommended for you :</h1>
                  </div>
@@ -337,7 +418,7 @@ export default function Recommendation() {
                                    <p className="text-gray-500 text-sm font-bold uppercase tracking-wider mb-1">{featuredShoe.brand}</p>
                                    <h2 className="text-4xl font-serif font-bold text-gray-900 leading-tight">{featuredShoe.name}</h2>
                                </div>
-                               <button onClick={(e) => { e.stopPropagation(); handleAddFavorite(String(featuredShoe.shoe_id || featuredShoe.id)); }} className="transition-transform active:scale-90">
+                               <button onClick={(e) => { e.stopPropagation(); handleAddFavorite(String(featuredShoe.shoe_id || featuredShoe.id)); }} className="transition-transform active:scale-90 cursor-pointer">
                                    {favoriteIds.includes(String(featuredShoe.shoe_id || featuredShoe.id)) ? (
                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10 text-red-500"><path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" /></svg>
                                    ) : (
@@ -350,7 +431,7 @@ export default function Recommendation() {
                                <svg className="w-6 h-6 text-gray-800 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                                <span className="text-xl font-bold text-gray-800">{featuredShoe.rating ? featuredShoe.rating.toFixed(1) : "0.0"}</span>
                            </div>
-                           <button onClick={() => navigate(`/shoe/${featuredShoe.slug || featuredShoe.id}`)} className="bg-[#000080] text-white px-8 py-3 rounded-lg font-bold text-lg hover:bg-blue-900 transition-colors shadow-lg">Learn More</button>
+                           <button onClick={() => navigate(`/shoe/${featuredShoe.slug || featuredShoe.id}`)} className="bg-[#000080] text-white px-8 py-3 rounded-lg font-bold text-lg hover:bg-blue-900 transition-colors shadow-lg cursor-pointer">Learn More</button>
                        </div>
                    </div>
                ) : (<div className="text-center py-20 text-gray-500 bg-white/80 rounded-2xl mb-10 shadow-sm border border-gray-100"><p className="text-lg">No recommendations found yet.</p><p className="text-sm">Try adjusting your filters or search again.</p></div>)}
@@ -415,14 +496,14 @@ export default function Recommendation() {
                                        </div>
                                    </div>
                                    <div className="flex flex-row sm:flex-col items-center justify-between w-full sm:w-auto gap-3 mt-2 sm:mt-0">
-                                       <button onClick={(e) => { e.stopPropagation(); handleAddFavorite(String(shoe.shoe_id || shoe.id)); }} className="transition-transform active:scale-90 text-gray-400 hover:text-red-500">
+                                       <button onClick={(e) => { e.stopPropagation(); handleAddFavorite(String(shoe.shoe_id || shoe.id)); }} className="transition-transform active:scale-90 text-gray-400 hover:text-red-500 cursor-pointer">
                                            {favoriteIds.includes(String(shoe.shoe_id || shoe.id)) ? (
                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 text-red-500"><path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" /></svg>
                                            ) : (
                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" /></svg>
                                            )}
                                        </button>
-                                       <button onClick={() => navigate(`/shoe/${shoe.slug || shoe.shoe_id || shoe.id}`)} className="bg-[#000080] text-white text-xs font-bold px-5 py-2.5 rounded-lg hover:bg-blue-900 transition-colors whitespace-nowrap">Learn More</button>
+                                       <button onClick={() => navigate(`/shoe/${shoe.slug || shoe.shoe_id || shoe.id}`)} className="bg-[#000080] text-white text-xs font-bold px-5 py-2.5 rounded-lg hover:bg-blue-900 transition-colors whitespace-nowrap cursor-pointer">Learn More</button>
                                    </div>
                                </div>
                            ))
@@ -439,21 +520,28 @@ export default function Recommendation() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 font-sans animate-in fade-in duration-500" style={gridStyle}>
       <div className="bg-white/90 backdrop-blur-md rounded-xl shadow-2xl w-full max-w-md p-6 relative border border-gray-100">
-        <button onClick={() => setStep("menu")} className="absolute top-4 left-4 text-[10px] font-bold text-gray-400 hover:text-orange-500 bg-gray-50 px-2 py-1 rounded-full">← BACK</button>
+        {/* 🔥 RESET STORAGE SAAT BACK DARI FORM */}
+        <button 
+            onClick={() => {
+                setStep("menu");
+                sessionStorage.removeItem("rush_rec_state");
+            }} 
+            className="absolute top-4 left-4 text-[10px] font-bold text-gray-400 hover:text-orange-500 bg-gray-50 px-2 py-1 rounded-full cursor-pointer"
+        >
+            ← BACK
+        </button>
+
         <h1 className="text-center font-serif font-bold text-lg mb-1 mt-4 uppercase tracking-wider">{step === "road" ? "User Input Road" : "User Input Trail"}</h1>
         {error && (<div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2"><span>{error}</span><Link to="/login" className="px-4 py-1.5 bg-red-600 text-white text-[10px] font-bold rounded-full hover:bg-red-700 transition-colors">Go to Login</Link></div>)}
         <div className="text-right mb-4"><button onClick={handleUseProfile} disabled={profileLoading} className="text-[12px] italic text-gray-500 hover:text-blue-600 underline disabled:opacity-50">{profileLoading ? "Loading Profile..." : "Use My Profile"}</button></div>
         
-        {/* INPUT: Foot Width */}
+        {/* ... FORM INPUTS (TETAP SAMA) ... */}
         <div className="mb-6 text-left"><label className="block text-sm font-bold mb-3 uppercase text-gray-800">Foot Width Type <span className="text-red-500">*</span></label><div className="grid grid-cols-3 gap-3">{widthOptions.map((opt) => (<button key={opt.label} onClick={() => handleToggleSelect('footWidth', opt.value)} className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center transition-all ${commonData.footWidth === opt.value ? activeStyle : inactiveStyle}`}><img src={opt.img} alt={opt.label} className="h-10 w-auto mb-2" /><span className="text-[12px] font-bold">{opt.label}</span></button>))}</div></div>
         
-        {/* INPUT: Arch Type */}
         <div className="mb-6 text-left"><label className="block text-sm font-bold mb-3 uppercase text-gray-800">Arch Type <span className="text-red-500">*</span></label><div className="grid grid-cols-3 gap-3">{archOptions.map((opt) => (<button key={opt.label} onClick={() => handleToggleSelect('archType', opt.value)} className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center transition-all ${commonData.archType === opt.value ? activeStyle : inactiveStyle}`}><img src={opt.img} alt={opt.label} className="h-8 w-auto mb-2" /><span className="text-[12px] font-bold leading-tight">{opt.label}</span></button>))}</div></div>
         
-        {/* INPUT: Orthotics */}
         <div className="mb-6 text-left"><label className="block text-sm font-bold mb-3 uppercase text-gray-800">Orthotics Usage <span className="text-red-500">*</span></label><div className="grid grid-cols-2 gap-4">{['Yes', 'No'].map(val => (<button key={val} onClick={() => handleToggleSelect('orthotics', val)} className={`cursor-pointer border-2 rounded-xl p-4 flex flex-col items-center justify-center transition-all ${commonData.orthotics === val ? activeStyle : inactiveStyle}`}><span className="text-xs font-bold text-center">{val === 'Yes' ? 'Yes, I use orthotics' : "No, I don't"}</span></button>))}</div></div>
 
-        {/* FORM LANJUTAN */}
         {step === "road" ? (<SelectionGroup label="Running Purpose" options={['Daily', 'Tempo', 'Race']} category="purpose" required />) : (<div className="mb-6 text-left"><label className="block text-sm font-bold mb-3 uppercase text-gray-800">Trail Terrain <span className="text-red-500">*</span></label><div className="grid grid-cols-2 gap-4">{['Mixed', 'Rocky', 'Muddy', 'Light'].map(t => (<button key={t} onClick={() => handleToggleSelect('terrain', t)} className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all ${trailData.terrain === t ? activeStyle : inactiveStyle}`}><span className={`text-[12px] font-bold ${trailData.terrain === t ? 'text-blue-900' : 'text-gray-700'}`}>{t}</span></button>))}</div></div>)}
 
         <div className="text-center mt-2">
