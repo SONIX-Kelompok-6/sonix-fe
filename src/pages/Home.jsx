@@ -62,7 +62,7 @@ const Home = () => {
               // A. Ambil List ID dari ML (Contoh: ["R158", "R002"])
               const idList = await getUserFeed(userId);
               
-              // B. 🔥 HYDRATION: Ganti ID jadi Object Sepatu Lengkap 🔥
+              // B. HYDRATION: Ganti ID jadi Object Sepatu Lengkap 
               if (idList && idList.length > 0) {
                 // Handle jika response dibungkus object atau array langsung
                 const rawIds = Array.isArray(idList) ? idList : (idList.data || []);
@@ -96,7 +96,7 @@ const Home = () => {
           fetchData();
       }
     }
-  }, [allShoes.length]); // 🔥 Re-run saat data sepatu di context selesai loading
+  }, [allShoes.length]); // Re-run saat data sepatu di context selesai loading
 
   // --- 3. OBSERVER SCROLL ---
   useEffect(() => {

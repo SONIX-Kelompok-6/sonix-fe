@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
-import { useParams, Link } from "react-router-dom";
-import { FaHeart, FaRegHeart, FaStar, FaPlus } from "react-icons/fa";
-import { sendInteraction } from "../services/SonixMl"; // 🔥 ML Service is BACK
+import { useParams, Link, useNavigate } from "react-router-dom"; // Tambah useNavigate
+import { FaHeart, FaRegHeart, FaStar, FaPlus, FaArrowLeft } from "react-icons/fa"; // Tambah FaArrowLeft
+import { sendInteraction } from "../services/SonixMl"; 
 import Navbar from "../components/Navbar";
 import api from "../api/axios";
 import { useShoes } from "../context/ShoeContext"; 
@@ -9,6 +9,7 @@ import Footer from "../components/Footer";
 
 export default function ShoeDetail() {
   const { slug } = useParams();
+  const navigate = useNavigate(); // Hook Navigasi
   const { allShoes, updateShoeState } = useShoes(); 
 
   // --- 🔥 1. INSTANT STATE INITIALIZATION (SPEED HACK) 🔥 ---
@@ -38,7 +39,7 @@ export default function ShoeDetail() {
 
   // --- LOGIC GUEST NAME ---
   const token = localStorage.getItem("userToken");
-  const userId = localStorage.getItem("userId"); // Ambil User ID buat ML
+  const userId = localStorage.getItem("userId"); 
   const userEmail = localStorage.getItem("userEmail");
   const userName = localStorage.getItem("userName");
 
@@ -83,8 +84,7 @@ export default function ShoeDetail() {
         );
         updateShoeState(updatedGlobalList);
 
-        // 🔥 ML TRIGGER: CLICK / VIEW (Implicit Feedback)
-        // Kita kirim sinyal bahwa user "tertarik" (click) barang ini
+        // 🔥 ML TRIGGER: CLICK / VIEW
         if (userId && freshData.shoe_id) {
             sendInteraction(userId, freshData.shoe_id, 'click', 1).catch(err => 
                 console.warn("[ML] Gagal kirim click data", err)
@@ -160,9 +160,7 @@ export default function ShoeDetail() {
 
       // 🔥 ML TRIGGER: RATE & REVIEW
       if (userId) {
-          // Kirim Rating (Explicit Feedback kuat)
           sendInteraction(userId, shoeData.shoe_id, 'rate', newReview.rating).catch(console.warn);
-          // Kirim Review (Menandakan engagement tinggi)
           sendInteraction(userId, shoeData.shoe_id, 'review', 1).catch(console.warn);
       }
 
@@ -181,7 +179,7 @@ export default function ShoeDetail() {
 
     const previousStatus = shoeData.isFavorite;
     const newStatus = !previousStatus;
-    const interactionValue = newStatus ? 1 : 0; // 1 = Like, 0 = Unlike (Netral/Dislike)
+    const interactionValue = newStatus ? 1 : 0; 
 
     // Optimistic Update
     const updatedShoeData = { ...shoeData, isFavorite: newStatus };
@@ -202,9 +200,6 @@ export default function ShoeDetail() {
 
       // 🔥 ML TRIGGER: LIKE
       if (userId) {
-          // Kirim Like ke ML.
-          // Note: Beberapa model ML mungkin butuh 'unlike' (value 0) atau cuma butuh 'like' (value 1) aja.
-          // Di sini kita kirim statusnya.
           sendInteraction(userId, shoeData.shoe_id, 'like', interactionValue).catch(console.warn);
       }
 
@@ -249,8 +244,20 @@ export default function ShoeDetail() {
   return (
     <div className="min-h-screen bg-[#4a76a8]">
       <Navbar />
-      <div className="container mx-auto px-14 pt-35 pb-2">
-        <div className="bg-white rounded-3xl overflow-hidden shadow-xl">
+      <div className="container mx-auto px-4 pt-24 pb-12">
+        
+        {/* 🔥 TOMBOL BACK YANG BISA BALIK KE PAGE SEBELUMNYA (DINAMIS) 🔥 */}
+        <button 
+            onClick={() => navigate(-1)} // Navigasi ke history sebelumnya
+            className="mb-6 flex items-center gap-2 text-white/80 hover:text-white transition-colors font-bold group w-fit cursor-pointer"
+        >
+            <div className="bg-white/10 p-2 rounded-full group-hover:bg-white/20 transition-all backdrop-blur-sm">
+                <FaArrowLeft />
+            </div>
+            <span>Back</span>
+        </button>
+
+        <div className="bg-white rounded-3xl overflow-hidden shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="flex flex-col md:flex-row">
             <div className="md:w-1/2 p-8 flex items-center justify-center bg-gray-100">
               <img
