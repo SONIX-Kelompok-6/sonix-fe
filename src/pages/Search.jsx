@@ -112,7 +112,7 @@ export default function Search() {
 
   // --- RENDER ---
   return (
-    <div className="max-w-6xl mx-auto px-6 pb-12">
+    <div className="max-w-6xl mx-auto px-6 pt-30">
       <div className="mb-8 border-b pb-4">
         <h1 className="text-2xl font-bold text-gray-800">
           Search Results for <span className="text-blue-600">"{query}"</span>
