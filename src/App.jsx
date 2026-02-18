@@ -18,6 +18,7 @@ import ShoeDetail from "./pages/ShoeDetail";
 import Search from "./pages/Search"; 
 import Compare from "./pages/Compare";
 import Account from "./pages/Account";
+import Contact from "./pages/Contact";
 
 export default function App() {
   const location = useLocation();
@@ -59,6 +60,8 @@ export default function App() {
           <Route path="/shoe/:slug" element={<ShoeDetail />} />
           <Route path="/compare" element={<Compare />} />
           <Route path="/account" element={<Account />} />
+          <Route path="/contact" element={<Contact />} />
+
 
           <Route path="*" element={<div className="text-center font-bold mt-10">404 - Page Not Found</div>} />
         </Routes>
