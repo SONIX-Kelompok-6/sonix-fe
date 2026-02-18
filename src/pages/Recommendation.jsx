@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import api from "../api/axios"; 
 import { useNavigate, Link } from "react-router-dom";
 import { getRecommendations, sendInteraction, getUserFeed } from "../services/SonixMl";
-
+import { useShoes } from "../context/ShoeContext"; 
 
 // --- IMPORT ASSETS ---
 import roadImg from "../assets/recommendation-page/road.png";
@@ -16,7 +16,6 @@ import imgHigh from '../assets/profile-images/arch-high.svg';
 
 const BRANDS_LIST = ["ASICS", "Nike", "New Balance", "Adidas", "Saucony", "HOKA", "Brooks", "On", "PUMA", "Altra", "Mizuno", "Salomon", "Under Armour", "Skechers", "Reebok", "Merrell", "Topo Athletic"];
 
-// Helper untuk normalisasi teks (Huruf besar di awal)
 const capitalizeFirst = (str) => {
   if (!str) return null;
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
@@ -24,6 +23,9 @@ const capitalizeFirst = (str) => {
 
 export default function Recommendation() {
   const navigate = useNavigate();
+
+  // --- AMBIL DATA DARI CONTEXT (GUDANG DATA) ---
+  const { allShoes, isLoading: isContextLoading } = useShoes();
 
   const [step, setStep] = useState("menu"); 
   const [showMore, setShowMore] = useState(false);
@@ -34,7 +36,6 @@ export default function Recommendation() {
   // --- STATE DATA ---
   const [searchResults, setSearchResults] = useState([]); 
   const [favoriteIds, setFavoriteIds] = useState([]); 
-  // State untuk "You Might Also Like" (Real-time AI)
   const [realtimeRecs, setRealtimeRecs] = useState([]);
 
   // STATES INPUT
@@ -45,7 +46,7 @@ export default function Recommendation() {
   const [sortBy, setSortBy] = useState("recommended");
 
   // ==============================================
-  // 1. HYBRID FEED TRIGGER (Saat Masuk Pertama Kali)
+  // 1. HYBRID FEED TRIGGER (UPDATED: Hydration Support)
   // ==============================================
   useEffect(() => {
     const token = localStorage.getItem("userToken");
@@ -55,19 +56,31 @@ export default function Recommendation() {
       setError("Please login to use the Recommendation feature.");
     } else {
       setError(null);
-      if (userId) {
+      if (userId && allShoes.length > 0) { // Pastikan allShoes siap
         const fetchFeed = async () => {
           try {
+            // Ambil Feed (Bisa berupa object lengkap ATAU cuma ID)
             const feed = await getUserFeed(userId);
+            
             if (feed && feed.length > 0) {
-              setSearchResults(feed);
+               // 🔥 HYDRATION LOGIC: Convert ID/Partial Data -> Full Data dari Context
+               const hydratedFeed = feed.map(item => {
+                  const targetId = typeof item === 'object' ? (item.id || item.shoe_id) : item;
+                  return allShoes.find(s => 
+                      String(s.shoe_id) === String(targetId) || 
+                      String(s.slug) === String(targetId) ||
+                      String(s.id) === String(targetId)
+                  );
+               }).filter(Boolean); // Hapus yang undefined
+
+               setSearchResults(hydratedFeed.length > 0 ? hydratedFeed : feed);
             }
           } catch (err) { console.error("Feed error:", err); }
         };
         fetchFeed();
       }
     }
-  }, []);
+  }, [allShoes.length]); // Re-run kalau context loaded
 
   // --- FETCH FAVORITES ---
   useEffect(() => {
@@ -78,34 +91,30 @@ export default function Recommendation() {
         const response = await api.get("/api/favorites/", {
           headers: { Authorization: `Token ${token}` },
         });
-        const ids = response.data.map(item => item.shoe_id);
+        const ids = response.data.map(item => String(item.shoe_id));
         setFavoriteIds(ids);
       } catch (err) { console.error("Gagal load favorites", err); }
     };
     fetchUserFavorites();
   }, []);
 
- // --- HANDLE USE MY PROFILE (FIXED ARCH MATCHING) ---
+  // --- HANDLE USE MY PROFILE ---
   const handleUseProfile = async () => {
     const token = localStorage.getItem("userToken");
     if (!token) { setError("Please login to use profile."); return; }
     setProfileLoading(true);
     try {
       const response = await api.get("/api/profile/", { headers: { Authorization: `Token ${token}` } });
-      
       const userProfile = response.data.profile || response.data;
 
-      // 1. PERBAIKAN DISINI: Hapus kata " Arch" biar cocok sama Value tombol
       let mappedArch = null;
       if (userProfile.arch_type) {
          const archLower = userProfile.arch_type.toLowerCase();
-         // Value tombol kamu adalah "Flat", "High", "Normal". Bukan "Flat Arch".
          if (archLower.includes("flat")) mappedArch = "Flat";
          else if (archLower.includes("high")) mappedArch = "High";
          else mappedArch = "Normal";
       }
 
-      // 2. Normalisasi Foot Width
       let mappedWidth = null;
       if (userProfile.foot_width) {
           mappedWidth = capitalizeFirst(userProfile.foot_width.trim());
@@ -113,17 +122,22 @@ export default function Recommendation() {
 
       setCommonData({ 
           footWidth: mappedWidth, 
-          archType: mappedArch,  // Sekarang isinya "Normal", cocok dengan value tombol!
+          archType: mappedArch, 
           orthotics: userProfile.uses_orthotics ? "Yes" : "No" 
       });
       setError(null);
     } catch (err) { setError("Failed to load profile."); } finally { setProfileLoading(false); }
   };
 
-  // --- HANDLE FIND (VERSI HYBRID: ML + DB REALTIME) ---
+  // --- 3. HANDLE FIND (UPDATED: Handle IDs Only Response) ---
   const handleFind = async () => {
     const userId = localStorage.getItem("userId");
     if (!userId) { setError("User ID not found. Please re-login."); return; }
+    
+    if (isContextLoading || !allShoes || allShoes.length === 0) {
+        setError("Database is still loading... please wait a moment.");
+        return;
+    }
 
     setLoading(true);
     const cleanArch = commonData.archType; 
@@ -154,32 +168,54 @@ export default function Recommendation() {
     };
 
     try {
-      // 1. Minta Rekomendasi ke AI (Cuma butuh daftar slug-nya)
-      const mlResults = await getRecommendations(type, payload);
+      // 1. Minta Rekomendasi ke AI (Sekarang response lebih ringan, misal cuma ID)
+      const response = await getRecommendations(type, payload);
+      console.log("🔍 ML Raw Response:", response);
 
-      if (!mlResults || mlResults.length === 0) {
+      let mlList = [];
+      if (response && response.data && Array.isArray(response.data)) {
+          mlList = response.data; 
+      } else if (Array.isArray(response)) {
+          mlList = response;      
+      }
+
+      console.log("📋 Extracted List:", mlList);
+
+      if (mlList.length === 0) {
         setSearchResults([]);
         setStep("results");
+        setLoading(false);
         return;
       }
 
-      // 2. Ambil ID saja dari hasil ML (biasanya field 'id' atau 'shoe_id')
-      const recommendedIds = mlResults.map(shoe => shoe.id || shoe.shoe_id);
+      // 🔥 PERBAIKAN DISINI 🔥
+      const hydratedResults = mlList.map(mlItem => {
+          // LOGIC BARU: Cek apakah itemnya Object (Legacy) atau String (ID Baru)
+          const targetId = typeof mlItem === 'object' ? (mlItem.id || mlItem.shoe_id) : mlItem;
+          
+          // Debugging: Cek ID yang mau dicari
+          // console.log("Mencari ID:", targetId);
 
-      // 3. Ambil data asli dari DB menggunakan ID (Hydration)
-      // Kita tembak endpoint baru: /api/shoes/id/${id}/
-      const freshDataPromises = recommendedIds.map(id => 
-        api.get(`/api/shoes/id/${id}/`).then(res => res.data).catch(() => null)
-      );
+          // Cari di database local (allShoes)
+          // Pastikan kedua sisi dijadikan String agar aman
+          const foundShoe = allShoes.find(s => 
+              String(s.shoe_id) === String(targetId) || 
+              String(s.slug) === String(targetId) ||
+              String(s.id) === String(targetId)
+          );
+          
+          if (!foundShoe) console.warn(`⚠️ Sepatu ID ${targetId} tidak ditemukan di Context.`);
+          return foundShoe;
+      }).filter(item => item !== undefined); // Hapus yang tidak ketemu
 
-      const freshShoes = await Promise.all(freshDataPromises);
-      
-      // 4. Update state (Rating sekarang pasti 5.0 atau sesuai DB!)
-      setSearchResults(freshShoes.filter(s => s !== null));
+      console.log("✅ Final Results:", hydratedResults);
+
+      setSearchResults(hydratedResults);
       setError(null);
       setStep("results");
 
     } catch (err) {
+      console.error("❌ AI Error:", err);
       setError("AI Engine is busy. Please try again.");
     } finally { 
       setLoading(false); 
@@ -190,20 +226,12 @@ export default function Recommendation() {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId");
     
-    if (!token) { 
-        setError("Please login to save favorites."); 
-        return; 
-    }
+    if (!token) { setError("Please login to save favorites."); return; }
 
     const idString = String(shoeId);
     const isCurrentlyFavorite = favoriteIds.includes(idString);
-
-    // Logic Value: 
-    // If currently favorite (True) -> User wants to UNLIKE -> Send 0
-    // If currently not favorite (False) -> User wants to LIKE -> Send 1
     const interactionValue = isCurrentlyFavorite ? 0 : 1; 
 
-    // Optimistic Update (UI)
     setFavoriteIds((prevIds) => 
         isCurrentlyFavorite 
         ? prevIds.filter(id => id !== idString) 
@@ -211,50 +239,25 @@ export default function Recommendation() {
     );
 
     try {
-      // 1. Call Backend API (Database) - CRITICAL
-      // This must succeed. If it fails, it goes to the main 'catch' block.
       await api.post(
           "/api/favorites/toggle/", 
           { shoe_id: idString }, 
           { headers: { Authorization: `Token ${token}` } }
       );
       
-      // 2. --- CALL ML API (INTERACT) - BEST EFFORT ---
-      // We wrap this in its own try-catch so it doesn't break the flow if it fails
       if (userId) {
-        try {
-            console.log(`[ML] Sending interaction... Value: ${interactionValue}`);
-            
-            // Send interaction to ML
-            const feedbackRecs = await sendInteraction(userId, idString, 'like', interactionValue);
-            
-            // Update realtime recommendations (Only if ML succeeds)
-            if (feedbackRecs && feedbackRecs.length > 0) {
-                setRealtimeRecs(feedbackRecs);
-            }
-            console.log("[ML] Success!");
-
-        } catch (mlErr) {
-            // IF ML FAILS: Log warning only. DO NOT ROLLBACK UI.
-            console.warn("[ML] Failed to send interaction, but Database is safe.", mlErr);
-        }
+        sendInteraction(userId, idString, 'like', interactionValue).catch(console.warn);
       }
-
     } catch (err) {
-      // This Catch block ONLY runs if the DATABASE (Step 1) fails.
-      console.error("Failed to toggle favorite (DB Error):", err);
-      
-      // Rollback UI (Undo the heart change)
+      console.error("Failed to toggle favorite:", err);
       setFavoriteIds((prevIds) => 
-          isCurrentlyFavorite 
-          ? [...prevIds, idString] 
-          : prevIds.filter(id => id !== idString)
+          isCurrentlyFavorite ? [...prevIds, idString] : prevIds.filter(id => id !== idString)
       );
       setError("Failed to sync with server.");
     }
   };
 
-  // --- LOGIC DISPLAY, SORT, & FILTER (DIPERBAIKI) ---
+  // --- LOGIC DISPLAY, SORT, & FILTER ---
   const handleToggleSelect = (category, value) => {
     const commonKeys = ['footWidth', 'archType', 'orthotics'];
     if (commonKeys.includes(category)) {
@@ -285,24 +288,19 @@ export default function Recommendation() {
   const featuredShoe = sourceData[0]; 
   const availableListShoes = sourceData.slice(1);
   
-  // --- PERBAIKAN FILTERING DISINI ---
   const filteredListShoes = useMemo(() => {
-    let result = [...availableListShoes]; // Copy array
+    let result = [...availableListShoes]; 
 
-    // 1. Filter Brand (Robust & Case Insensitive)
     if (selectedBrands.length > 0) {
         result = result.filter(shoe => {
             if (!shoe.brand) return false;
-            // Bersihkan data brand (kecilkan huruf & hapus spasi)
             const shoeBrandClean = shoe.brand.toString().toLowerCase().trim();
-            // Cek apakah ada di selectedBrands (yang juga dibersihkan)
             return selectedBrands.some(selected => 
                 selected.toLowerCase().trim() === shoeBrandClean
             );
         });
     }
 
-    // 2. Sorting
     if (sortBy === "lowHigh") result.sort((a, b) => (Number(a.weight_lab_oz) || 999) - (Number(b.weight_lab_oz) || 999));
     else if (sortBy === "highLow") result.sort((a, b) => (Number(b.weight_lab_oz) || 0) - (Number(a.weight_lab_oz) || 0));
     
@@ -320,7 +318,6 @@ export default function Recommendation() {
       <label className="block text-xs font-bold mb-3 uppercase text-gray-700">{label} {required && <span className="text-red-500">*</span>}</label>
       <div className="flex gap-3">
         {options.map((opt) => {
-          // Tangani opsi yang punya value terpisah atau pakai label langsung
           const valToCheck = opt.value || opt.label || opt; 
           const isSelected = getCurrentValue(category) === valToCheck;
           
@@ -337,21 +334,51 @@ export default function Recommendation() {
   // --- RENDER MENU ---
   if (step === "menu") {
     return (
-      <div className="bg-white rounded-3xl shadow-xl w-[90%] max-w-[400px] p-8 mx-auto my-10 border border-gray-100 flex flex-col items-center">
+      <div className="bg-white rounded-3xl shadow-xl w-[90%] max-w-4xl p-8 mx-auto my-10 border border-gray-100 flex flex-col items-center transition-all duration-500">
+        
         {error && (
-            <div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2">
-                <span>{error}</span>
+          <div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2">
+            <span>{error}</span>
+          </div>
+        )}
+
+        {isContextLoading && (
+            <div className="mb-4 px-4 py-2 bg-blue-50 text-blue-800 rounded-full text-xs font-bold animate-pulse">
+                Preparing database...
             </div>
         )}
-        <h2 className="text-center font-bold tracking-[0.1em] mb-5 text-gray-800 text-xl">TYPES OF RUNNING</h2>
-        <div className="flex flex-col gap-6 w-full">
-          <div onClick={() => {if(!error) {setStep("road"); setShowMore(false);} }} className={`relative rounded-2xl overflow-hidden group shadow-md transition-all ${error ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-xl'}`}>
-             <img src={roadImg} alt="Road" className={`w-full h-[165px] object-cover transition-transform duration-700 ${!error && 'group-hover:scale-110'}`} />
-             <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-all"><span className="text-white text-3xl font-extrabold drop-shadow-2xl [-webkit-text-stroke:1px_orange] uppercase tracking-wider">Road Running</span></div>
+
+        <h2 className="text-center font-bold tracking-[0.1em] mb-8 text-gray-800 text-xl uppercase">
+          Types of Running
+        </h2>
+
+        <div className="flex flex-col md:flex-row gap-6 w-full px-2">
+          {/* --- ROAD RUNNING CARD --- */}
+          <div 
+            onClick={() => { if(!error && !isContextLoading) { setStep("road"); setShowMore(false); } }} 
+            className={`relative flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-64 
+              ${(error || isContextLoading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`
+            }
+          >
+            <img src={roadImg} alt="Road" className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out ${(!error && !isContextLoading) && 'group-hover:scale-110'}`} />
+            <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors duration-300"></div>
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              <span className="text-white text-4xl md:text-5xl font-bold tracking-[0.25em] uppercase drop-shadow-lg text-center px-4">ROAD</span>
+            </div>
           </div>
-          <div onClick={() => {if(!error) {setStep("trail"); setShowMore(false);} }} className={`relative rounded-2xl overflow-hidden group shadow-md transition-all ${error ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-xl'}`}>
-             <img src={trailImg} alt="Trail" className={`w-full h-[165px] object-cover transition-transform duration-700 ${!error && 'group-hover:scale-110'}`} />
-             <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-all"><span className="text-white text-3xl font-extrabold drop-shadow-2xl [-webkit-text-stroke:1px_orange] uppercase tracking-wider">Trail Running</span></div>
+
+          {/* --- TRAIL RUNNING CARD --- */}
+          <div 
+            onClick={() => { if(!error && !isContextLoading) { setStep("trail"); setShowMore(false); } }} 
+            className={`relative flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-64 
+              ${(error || isContextLoading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`
+            }
+          >
+            <img src={trailImg} alt="Trail" className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out ${(!error && !isContextLoading) && 'group-hover:scale-110'}`} />
+            <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors duration-300"></div>
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              <span className="text-white text-4xl md:text-5xl font-bold tracking-[0.25em] uppercase drop-shadow-lg text-center px-4">TRAIL</span>
+            </div>
           </div>
         </div>
       </div>
@@ -398,23 +425,21 @@ export default function Recommendation() {
                                <svg className="w-6 h-6 text-gray-800 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                                <span className="text-xl font-bold text-gray-800">{featuredShoe.rating ? featuredShoe.rating.toFixed(1) : "0.0"}</span>
                            </div>
-                           {/* --- PERBAIKAN LEARN MORE DISINI --- */}
                            <button 
-                                onClick={() => navigate(`/shoe/${featuredShoe.slug || featuredShoe.id}`)}
-                                className="bg-[#000080] text-white px-8 py-3 rounded-lg font-bold text-lg hover:bg-blue-900 transition-colors shadow-lg"
+                               onClick={() => navigate(`/shoe/${featuredShoe.slug || featuredShoe.id}`)}
+                               className="bg-[#000080] text-white px-8 py-3 rounded-lg font-bold text-lg hover:bg-blue-900 transition-colors shadow-lg"
                            >
                                Learn More
                            </button>
                        </div>
                    </div>
                ) : (
-                  <div className="text-center py-20 text-gray-500 bg-white rounded-2xl mb-10 shadow-sm border border-gray-100">
+                 <div className="text-center py-20 text-gray-500 bg-white rounded-2xl mb-10 shadow-sm border border-gray-100">
                      <p className="text-lg">No recommendations found yet.</p>
                      <p className="text-sm">Try adjusting your filters or search again.</p>
-                  </div>
+                 </div>
                )}
 
-               {/* === REAL-TIME RECS === */}
                {realtimeRecs.length > 0 && (
                  <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
                     <h3 className="text-xl font-bold text-blue-900 mb-4 italic flex items-center gap-2">
@@ -503,9 +528,8 @@ export default function Recommendation() {
                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" /></svg>
                                            )}
                                        </button>
-                                       {/* --- PERBAIKAN LEARN MORE JUGA DISINI --- */}
                                        <button 
-                                            onClick={() => navigate(`/shoes/${shoe.shoe_id || shoe.id}`)}
+                                            onClick={() => navigate(`/shoe/${shoe.slug || shoe.shoe_id || shoe.id}`)}
                                             className="bg-[#000080] text-white text-xs font-bold px-5 py-2.5 rounded-lg hover:bg-blue-900 transition-colors whitespace-nowrap"
                                        >
                                             Learn More
@@ -535,7 +559,6 @@ export default function Recommendation() {
             </div>
         )}
 
-        {/* ... FORM SISANYA (FOOT WIDTH, ETC) TETAP SAMA ... */}
         <div className="text-right mb-4">
           <button onClick={handleUseProfile} disabled={profileLoading} className="text-[10px] italic text-gray-500 hover:text-blue-600 underline disabled:opacity-50">
             {profileLoading ? "Loading Profile..." : "Use My Profile"}
@@ -680,11 +703,11 @@ export default function Recommendation() {
       </div>
 
       <button 
-        disabled={!isFormValid() || error} // Matikan tombol jika ada error
+        disabled={!isFormValid() || error || isContextLoading} 
         onClick={handleFind} 
-        className={`mt-8 w-full max-w-md py-4 rounded-xl font-bold text-lg shadow-lg transition-all ${isFormValid() && !error ? 'bg-blue-900 text-white hover:bg-blue-800 active:scale-95 cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+        className={`mt-8 w-full max-w-md py-4 rounded-xl font-bold text-lg shadow-lg transition-all ${isFormValid() && !error && !isContextLoading ? 'bg-blue-900 text-white hover:bg-blue-800 active:scale-95 cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
       >
-        {loading ? 'Finding...' : 'Find'}
+        {loading ? 'Finding...' : isContextLoading ? 'Loading Database...' : 'Find'}
       </button>
     </div>
   );
