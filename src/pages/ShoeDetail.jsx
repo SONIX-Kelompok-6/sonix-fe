@@ -4,78 +4,89 @@ import { FaHeart, FaRegHeart, FaStar, FaPlus } from "react-icons/fa";
 import { sendInteraction } from "../services/SonixMl";
 import Navbar from "../components/Navbar";
 import api from "../api/axios";
+import { useShoes } from "../context/ShoeContext"; // 1. IMPORT CONTEXT
 
 export default function ShoeDetail() {
   const { slug } = useParams();
+  
+  // Ambil data global untuk instant load & sync
+  const { allShoes, updateShoeState } = useShoes(); 
+
   const [shoeData, setShoeData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [newReview, setNewReview] = useState({ rating: 0, text: "" });
 
-  // --- START UPDATE: LOGIC GUEST NAME ---
-  // 1. Ambil data dari LocalStorage
+  // --- LOGIC GUEST NAME ---
   const token = localStorage.getItem("userToken");
   const userEmail = localStorage.getItem("userEmail");
   const userName = localStorage.getItem("userName");
 
-  // 2. State untuk menyimpan nama random (dibuat sekali saat komponen mount)
   const [randomGuestName] = useState(() => {
     const randomId = Math.floor(Math.random() * 10000); 
     return `Runner_${randomId}`; 
   });
 
-  // 3. Tentukan nama yang dipakai (Prioritas: Username > Email Depan > Random)
   const currentUserName = (() => {
-    // A. Kalau tidak login -> Pakai Random Guest
     if (!token) return randomGuestName; 
-
-    // B. Kalau ada Username valid di LocalStorage -> PAKAI INI!
     if (userName && userName !== "null" && userName !== "undefined" && userName.trim() !== "") {
         return userName; 
     }
-    
-    // C. Fallback: Kalau Username kosong, ambil nama depan dari email
     if (userEmail) {
         const nameFromEmail = userEmail.split('@')[0];
         return nameFromEmail.charAt(0).toUpperCase() + nameFromEmail.slice(1);
     }
-
     return "User"; 
   })();
-  // --- END UPDATE LOGIC ---
 
+  // --- 2. UPDATE: INSTANT LOAD STRATEGY ---
   useEffect(() => {
-    const fetchShoeDetail = async () => {
-      setIsLoading(true);
+    const loadData = async () => {
+      // A. Cek Cache Dulu (Biar Instant)
+      const cachedShoe = allShoes.find((s) => s.slug === slug);
+      
+      if (cachedShoe) {
+        // Kalau ada di cache, tampilkan langsung!
+        setShoeData(prev => ({ ...cachedShoe, ...prev })); // Merge biar gak ilang data detail
+        setIsLoading(false); 
+      } else {
+        // Kalau gak ada di cache, baru set loading true
+        setIsLoading(true);
+      }
+
       setError(null);
 
       try {
-        console.log("Fetching shoe data for slug:", slug);
-        
-        // Mengambil token agar isFavorite tetap sinkron saat refresh
+        console.log("Fetching full details for:", slug);
         const token = localStorage.getItem("userToken");
 
+        // B. Fetch Data Lengkap dari Server (Background Sync)
+        // Kita butuh ini untuk dapet Review & Data Explore yg mungkin gak ada di list biasa
         const response = await api.get(
           `/api/shoes/${slug}/`,
-          {
-            headers: token ? { Authorization: `Token ${token}` } : {},
-          }
+          { headers: token ? { Authorization: `Token ${token}` } : {} }
         );
         
+        // Update state dengan data terlengkap dari server
         setShoeData(response.data);
+
       } catch (err) {
-        console.error("Error fetching data:", err);
-        setError("Oops! The shoe you are looking for could not be found.");
+        console.error("Error fetching detail:", err);
+        if (!cachedShoe) {
+           setError("Oops! The shoe you are looking for could not be found.");
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     if (slug) {
-      fetchShoeDetail();
+      loadData();
     }
-  }, [slug]);
+  }, [slug, allShoes.length]); // Dependency ke allShoes.length biar update kalau context berubah
 
+
+  // --- 3. UPDATE: OPTIMISTIC REVIEW SUBMIT ---
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
     
@@ -90,7 +101,35 @@ export default function ShoeDetail() {
       return;
     }
 
+    // A. Siapkan Data Review Baru
+    const addedReview = {
+        id: Date.now(), // ID sementara
+        user: currentUserName,
+        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=" + currentUserName,
+        date: "Just now",
+        text: newReview.text,
+        rating: newReview.rating,
+    };
+
+    // B. Hitung Rating Baru secara Lokal
+    const currentReviews = shoeData.reviews || [];
+    const newTotalReviews = currentReviews.length + 1;
+    const currentSumRating = currentReviews.reduce((sum, r) => sum + r.rating, 0);
+    const updatedAverage = (currentSumRating + newReview.rating) / newTotalReviews;
+
+    // C. UPDATE UI DULUAN (Optimistic)
+    const previousShoeData = { ...shoeData }; // Simpan state lama buat jaga-jaga
+    
+    setShoeData({
+        ...shoeData,
+        rating: Number(updatedAverage.toFixed(1)), 
+        reviews: [addedReview, ...currentReviews],
+    });
+    
+    setNewReview({ rating: 0, text: "" }); // Reset form langsung
+
     try {
+      // D. KIRIM KE SERVER (Background Process)
       await api.post(
         "/api/add-review/",
         {
@@ -98,43 +137,23 @@ export default function ShoeDetail() {
           rating: newReview.rating,
           text: newReview.text,
         },
-        {
-          headers: { Authorization: `Token ${token}` },
-        }
+        { headers: { Authorization: `Token ${token}` } }
       );
 
-      // --- LOGIKA UPDATE RATING RATA-RATA ---
-      const currentReviews = shoeData.reviews || [];
-      const newTotalReviews = currentReviews.length + 1;
-      const currentSumRating = currentReviews.reduce((sum, r) => sum + r.rating, 0);
-      const updatedAverage = (currentSumRating + newReview.rating) / newTotalReviews;
-
-      const addedReview = {
-        id: Date.now(),
-        user: currentUserName, // Menggunakan logic nama baru
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=" + currentUserName,
-        date: new Date().toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' }),
-        text: newReview.text,
-        rating: newReview.rating,
-      };
-
-      setShoeData({
-        ...shoeData,
-        // Update angka rating di sebelah ikon hati secara instan
-        rating: Number(updatedAverage.toFixed(1)), 
-        reviews: [addedReview, ...currentReviews],
-      });
-
-      setNewReview({ rating: 0, text: "" });
-      alert("Review submitted successfully!");
+      // Sukses? Gak perlu ngapa-ngapain karena UI udah update.
+      console.log("Review synced to server.");
 
     } catch (err) {
       console.error("Failed to submit review:", err);
-      alert("Failed to submit review. Please try again.");
+      // E. Kalau Gagal, Balikin UI ke Awal (Rollback)
+      setShoeData(previousShoeData); 
+      setNewReview({ rating: addedReview.rating, text: addedReview.text }); // Balikin teks user
+      alert("Failed to submit review. Please check your connection.");
     }
   };
 
 
+  // --- 4. UPDATE: SYNC FAVORITE KE GLOBAL CONTEXT ---
   const handleToggleFavorite = async () => {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId"); 
@@ -145,84 +164,63 @@ export default function ShoeDetail() {
     }
 
     const previousStatus = shoeData.isFavorite;
-    
-    // Logic Value: 
-    // If previous was True (Favorite) -> User wants to UNLIKE -> Value 0
-    // If previous was False (Not Favorite) -> User wants to LIKE -> Value 1
+    const newStatus = !previousStatus;
     const interactionValue = previousStatus ? 0 : 1;
 
-    // 1. Optimistic Update UI
-    setShoeData({ ...shoeData, isFavorite: !previousStatus });
+    // A. Update UI Halaman Detail (Lokal)
+    setShoeData({ ...shoeData, isFavorite: newStatus });
+
+    // B. Update Context Global (Supaya Page Favorite & Search ikut berubah)
+    // Kita cari sepatu ini di array global, update statusnya, lalu simpan balik
+    const updatedGlobalList = allShoes.map(s => 
+        s.shoe_id === shoeData.shoe_id ? { ...s, isFavorite: newStatus } : s
+    );
+    updateShoeState(updatedGlobalList); // <-- INI KUNCINYA
 
     try {
-      // 2. Call Backend API (Database) - MUST SUCCEED
-      const response = await api.post(
+      // C. Call API
+      await api.post(
         "/api/favorites/toggle/",
-        { shoe_id: shoeData.shoe_id },
-        {
-          headers: { Authorization: `Token ${token}` },
-        }
+        { shoe_id: String(shoeData.shoe_id) }, // Pastikan string biar aman
+        { headers: { Authorization: `Token ${token}` } }
       );
       
-      // Update state based on server response (for safety)
-      setShoeData({ ...shoeData, isFavorite: response.data.is_favorite });
-
-      // 3. --- CALL ML API (INTERACT) ---
-      // Isolated Try-Catch so it doesn't break the main flow
+      // ML Interaction
       if (userId) {
-          try {
-             console.log(`[ML] Sending interaction from Detail Page...`);
-             await sendInteraction(userId, shoeData.shoe_id, 'like', interactionValue);
-             console.log("[ML] Success!");
-          } catch (mlErr) {
-             // IF ML FAILS: Just log a warning. Do NOT rollback.
-             console.warn("[ML] Failed to interact, but Database saved successfully.", mlErr);
-          }
+          sendInteraction(userId, shoeData.shoe_id, 'like', interactionValue).catch(console.warn);
       }
-      // -----------------------------------
 
     } catch (err) {
-      // This Catch block ONLY runs if the DATABASE (Step 2) fails.
-      console.error("Failed to update favorite (DB Error):", err);
+      console.error("Failed to update favorite:", err);
       
-      // Rollback UI to previous state
+      // Rollback Lokal
       setShoeData({ ...shoeData, isFavorite: previousStatus });
+      // Rollback Global
+      updateShoeState(allShoes); 
       alert("Something went wrong. Please try again later.");
     }
   };
 
-  // --- ADD TO COMPARE ---
+  // --- ADD TO COMPARE (TETAP) ---
   const handleAddCompare = () => {
     if (!shoeData) return;
 
     let compareList = JSON.parse(localStorage.getItem("compareList")) || [];
 
-    // Cek Duplikat
     if (compareList.some((item) => item.shoe_id === shoeData.shoe_id)) {
       alert(`"${shoeData.name || shoeData.model}" is already in the list!`);
       return;
     }
 
-    // Cek Limit
     if (compareList.length >= 5) {
       alert("Max 5 shoes in comparison list!");
       return;
     }
 
-    // Prepare Data
-    // Kita ambil SEMUA data dari backend (...shoeData)
-    // Lalu kita pastikan field vital (slug, name, img_url) terisi standar
     const shoeToSave = {
         ...shoeData, 
-        
-        // STANDARISASI:
-        // Gunakan 'name' (models.py), fallback ke 'model' (legacy)
         name: shoeData.name || shoeData.model, 
-        
-        // Gunakan 'img_url' (models.py), fallback ke 'mainImage' (legacy)
         img_url: shoeData.img_url || shoeData.mainImage || "https://via.placeholder.com/500",
-        
-        // Pastikan slug ada (Prioritas: URL params > data backend)
         slug: slug || shoeData.slug 
     };
 
@@ -243,7 +241,7 @@ export default function ShoeDetail() {
           <div className="flex flex-col md:flex-row">
             <div className="md:w-1/2 p-8 flex items-center justify-center bg-gray-100">
               <img
-                src={shoeData.mainImage || "https://via.placeholder.com/500"}
+                src={shoeData.mainImage || shoeData.img_url || "https://via.placeholder.com/500"} // Backup image check
                 alt={shoeData.model}
                 className="max-w-full h-auto transform hover:scale-105 transition-transform duration-300"
               />
@@ -251,7 +249,7 @@ export default function ShoeDetail() {
 
             <div className="md:w-1/2 p-8 flex flex-col justify-center bg-[#e9eef5]">
               <h3 className="text-xl font-semibold text-gray-700">{shoeData.brand}</h3>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">{shoeData.model}</h1>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">{shoeData.name || shoeData.model}</h1>
               <p className="text-lg text-gray-600 mb-4">Weight : {shoeData.weight_lab_oz || "-"} oz</p>
               <p className="text-gray-700 mb-6 leading-relaxed">{shoeData.description}</p>
 
@@ -272,7 +270,7 @@ export default function ShoeDetail() {
                 </div>
                 <button 
                   onClick={handleAddCompare} 
-                  className="bg-[#0a0a5c] text-white px-8 py-3 rounded-full font-bold hover:bg-blue-900 transition-colors"
+                  className="bg-[#0a0a5c] text-white px-8 py-3 rounded-full font-bold hover:bg-blue-900 transition-colors cursor-pointer"
                 >
                   Compare
                 </button>
@@ -297,7 +295,6 @@ export default function ShoeDetail() {
         <div className="mt-12">
           <div className="bg-orange-400 rounded-t-2xl p-4 flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              {/* Ini akan menampilkan Nama User Asli jika login, atau "Guest_XXXX" jika tidak */}
               <span className="font-bold text-gray-800">{currentUserName}</span>
               <div className="flex text-2xl text-white">
                 {[1, 2, 3, 4, 5].map((star) => (
@@ -314,7 +311,7 @@ export default function ShoeDetail() {
               value={newReview.text}
               onChange={(e) => setNewReview({ ...newReview, text: e.target.value })}
             ></textarea>
-            <button type="submit" className="absolute right-6 text-gray-500 hover:text-blue-600 text-2xl"><FaPlus /></button>
+            <button type="submit" className="absolute right-6 text-gray-500 hover:text-blue-600 text-2xl cursor-pointer"><FaPlus /></button>
           </form>
 
           <div className="mt-8 space-y-6">
