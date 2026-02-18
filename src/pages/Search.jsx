@@ -1,46 +1,53 @@
-import { useEffect, useState } from "react";
-import { useSearchParams, Link } from "react-router-dom"; 
+import { useState, useMemo } from "react";
+import { useSearchParams, Link, useNavigate } from "react-router-dom"; 
 import api from "../api/axios";
 import { sendInteraction } from "../services/SonixMl";
-import { useShoes } from "../context/ShoeContext"; // IMPORT INI (Koneksi ke Gudang)
+import { useShoes } from "../context/ShoeContext"; 
 
 export default function Search() {
   const [searchParams] = useSearchParams();
   const query = searchParams.get("q");
+  const navigate = useNavigate();
 
-  // AMBIL DATA DARI CONTEXT (GUDANG GLOBAL)
-  // allShoes: Database lengkap (sudah didownload di awal)
-  // isLoading: Status loading dari Context
-  const { allShoes, isLoading, error, updateShoeState } = useShoes(); 
+  // AMBIL DATA DARI CONTEXT
+  const { allShoes, isLoading: contextLoading, error, updateShoeState } = useShoes(); 
 
-  // State lokal cuma buat hasil filter
-  const [filteredShoes, setFilteredShoes] = useState([]);
+  const [sortBy, setSortBy] = useState("relevance"); // State Sorting
 
-  // --- LOGIC FILTERING (Jalan tiap ngetik atau data gudang siap) ---
-  useEffect(() => {
-    // 1. Kalau gudang masih loading, tunggu aja
-    if (isLoading) return;
+  // --- LOGIC FILTERING & SORTING ---
+  // useMemo akan hitung ulang SECARA INSTAN setiap kali 'sortBy' atau 'query' berubah
+  const filteredAndSortedShoes = useMemo(() => {
+    if (!allShoes) return [];
 
-    // 2. Kalau gak ada query search, tampilkan SEMUA sepatu (Catalog Mode)
-    if (!query) {
-      setFilteredShoes([]);
-      return;
+    // 1. Filter berdasarkan keyword
+    let results = [];
+    if (query) {
+        const lowerQuery = query.toLowerCase();
+        results = allShoes.filter((shoe) => {
+            const nameMatch = shoe.name && shoe.name.toLowerCase().includes(lowerQuery);
+            const brandMatch = shoe.brand && shoe.brand.toLowerCase().includes(lowerQuery);
+            return nameMatch || brandMatch;
+        });
     }
 
-    // 3. Kalau ada query, filter dari 'allShoes'
-    const lowerQuery = query.toLowerCase();
-    const results = allShoes.filter((shoe) => {
-      const nameMatch = shoe.name && shoe.name.toLowerCase().includes(lowerQuery);
-      const brandMatch = shoe.brand && shoe.brand.toLowerCase().includes(lowerQuery);
-      return nameMatch || brandMatch;
-    });
+    // 2. Sorting Logic (Dilakukan pada hasil filter)
+    // Kita copy array dulu [...results] biar data asli gak keacak
+    const sortedResults = [...results];
 
-    setFilteredShoes(results);
+    if (sortBy === "lowHigh") {
+      sortedResults.sort((a, b) => (Number(a.weight_lab_oz) || 999) - (Number(b.weight_lab_oz) || 999));
+    } else if (sortBy === "highLow") {
+      sortedResults.sort((a, b) => (Number(b.weight_lab_oz) || 0) - (Number(a.weight_lab_oz) || 0));
+    }
+    // "relevance" biarkan default
 
-  }, [query, allShoes, isLoading]);
+    return sortedResults;
+  }, [query, allShoes, sortBy]);
 
+  // Loading cuma bergantung sama data awal Context
+  const isLoading = contextLoading;
 
-  // --- HANDLER FAVORITE (Update ke Context) ---
+  // --- HANDLER FAVORITE ---
   const handleAddFavorite = async (shoe) => {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId"); 
@@ -52,38 +59,29 @@ export default function Search() {
 
     const interactionValue = shoe.isFavorite ? 0 : 1;
 
-    // 1. UPDATE GLOBAL STATE (Context)
-    // Kita update data di 'Gudang' biar halaman lain juga tau kalau ini di-like
+    // UPDATE GLOBAL STATE (Context)
     const updatedList = allShoes.map((s) => 
       s.shoe_id === shoe.shoe_id ? { ...s, isFavorite: !s.isFavorite } : s
     );
     
-    // Fungsi ini akan otomatis update 'allShoes' dan 'filteredShoes'
     updateShoeState(updatedList); 
 
     try {
-      // 2. API CALL
       await api.post("/api/favorites/toggle/", { shoe_id: String(shoe.shoe_id) }, {
         headers: { Authorization: `Token ${token}` },
       });
 
-      // 3. ML INTERACTION
       if (userId) {
-          try {
-             await sendInteraction(userId, shoe.shoe_id, 'like', interactionValue);
-          } catch (mlErr) {
-             console.warn("[ML] Failed log.", mlErr);
-          }
+          sendInteraction(userId, shoe.shoe_id, 'like', interactionValue).catch(console.warn);
       }
     } catch (err) {
       console.error("Failed toggle:", err);
-      // Rollback (Balikin state kalau API error)
-      updateShoeState(allShoes); // Balikin ke state lama
+      updateShoeState(allShoes); // Rollback
       alert("Failed to update favorite status.");
     }
   };
 
-  // --- ADD TO COMPARE (TETAP SAMA) ---
+  // --- ADD TO COMPARE ---
   const handleAddCompare = (shoe) => {
     let compareList = JSON.parse(localStorage.getItem("compareList")) || [];
 
@@ -112,21 +110,46 @@ export default function Search() {
 
   // --- RENDER ---
   return (
-    <div className="max-w-6xl mx-auto px-6 pt-30">
-      <div className="mb-8 border-b pb-4">
-        <h1 className="text-2xl font-bold text-gray-800">
-          Search Results for <span className="text-blue-600">"{query}"</span>
-        </h1>
-        <p className="text-gray-500 text-sm mt-1">
-          {isLoading ? "Loading database..." : `Found ${filteredShoes.length} result(s).`}
-        </p>
+    <div className="max-w-6xl mx-auto px-6 pt-32 pb-12 font-sans min-h-screen">
+      
+      {/* HEADER SECTION */}
+      <div className="flex flex-col md:flex-row justify-between items-end mb-8 border-b pb-4 gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">
+            Search Results for <span className="text-blue-600">"{query}"</span>
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
+            {isLoading ? "Loading database..." : `Found ${filteredAndSortedShoes.length} result(s).`}
+          </p>
+        </div>
+
+        {/* DROPDOWN SORTING */}
+        <div className="flex items-center gap-3">
+             <span className="text-sm font-bold text-gray-500 uppercase tracking-wide">Sort By:</span>
+             <div className="relative">
+                <select 
+                  value={sortBy} 
+                  onChange={(e) => setSortBy(e.target.value)} 
+                  className="appearance-none bg-white border border-gray-200 text-gray-700 text-xs font-bold py-2.5 pl-4 pr-10 rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm transition-all hover:border-gray-300 cursor-pointer"
+                >
+                  <option value="relevance">Relevance</option>
+                  <option value="lowHigh">Weight: Lightest to Heaviest</option>
+                  <option value="highLow">Weight: Heaviest to Lightest</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                  <svg className="h-3 w-3 fill-current" viewBox="0 0 20 20">
+                    <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" fillRule="evenodd" />
+                  </svg>
+                </div>
+             </div>
+        </div>
       </div>
 
-      {/* LOADING STATE */}
+      {/* LOADING STATE (Hanya muncul saat download database awal) */}
       {isLoading && (
         <div className="flex justify-center items-center py-20">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-500">Loading Shoe Database...</span>
+          <span className="ml-3 text-gray-500">Searching...</span>
         </div>
       )}
 
@@ -138,20 +161,24 @@ export default function Search() {
       )}
 
       {/* EMPTY STATE */}
-      {!isLoading && !error && filteredShoes.length === 0 && (
+      {!isLoading && !error && filteredAndSortedShoes.length === 0 && (
         <div className="text-center py-20 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 mx-auto text-gray-400 mb-4">
-            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-          </svg>
+          <div className="text-5xl mb-4 grayscale opacity-20">👟</div>
           <h2 className="text-lg font-bold text-gray-700">Shoe not found</h2>
-          <p className="text-gray-500">Please try using a different keyword.</p>
+          <p className="text-gray-500 mb-6">Please try using a different keyword.</p>
+          <button 
+              onClick={() => navigate('/')}
+              className="px-6 py-2 bg-white border border-gray-300 text-gray-600 font-bold rounded-full hover:bg-gray-100 transition-colors text-xs"
+            >
+              Back to Home
+          </button>
         </div>
       )}
 
       {/* DATA GRID */}
-      {!isLoading && !error && filteredShoes.length > 0 && (
+      {!isLoading && !error && filteredAndSortedShoes.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {filteredShoes.map((shoe) => (
+          {filteredAndSortedShoes.map((shoe) => (
             <Link 
               to={`/shoe/${shoe.slug}`} 
               key={shoe.shoe_id} 
@@ -200,6 +227,11 @@ export default function Search() {
               <div className="p-5 flex flex-col flex-grow bg-white">
                 <p className="text-xs text-blue-600 font-bold uppercase tracking-widest mb-1">{shoe.brand || "Brand"}</p>
                 <h3 className="font-bold text-gray-800 text-base mb-3 line-clamp-2 leading-snug">{shoe.name}</h3>
+                
+                {/* Weight Indicator (Optional) */}
+                <div className="mt-auto flex items-center gap-2 text-xs font-bold text-gray-400">
+                    <span>⚖️ {shoe.weight_lab_oz || "-"} oz</span>
+                </div>
               </div>
             </Link>
           ))}
