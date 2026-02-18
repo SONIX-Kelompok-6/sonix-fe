@@ -7,13 +7,14 @@ const mlApi = axios.create({
   headers: { 'Content-Type': 'application/json' }
 });
 
-// Fungsi untuk Content-Based (Form Road/Trail)
+// Fungsi untuk Content-Based
 export const getRecommendations = async (type, payload) => {
   const response = await mlApi.post(`/recommend/${type}`, payload);
-  return response.data.data; 
+  // Kalau backend kirim array langsung ["R1", "R2"], dia ada di response.data
+  return response.data; 
 };
 
-// Fungsi untuk Collaborative (Like/Interact) - Maksud Shane
+// Fungsi untuk Collaborative
 export const sendInteraction = async (userId, shoeId, actionType, value) => {
   const response = await mlApi.post('/interact', {
     user_id: userId,
@@ -21,11 +22,15 @@ export const sendInteraction = async (userId, shoeId, actionType, value) => {
     action_type: actionType,
     value: value
   });
-  return response.data.data; 
+  return response.data; 
 };
 
-// Fungsi untuk Hybrid Feed (Halaman Depan)
+// Fungsi untuk Feed
 export const getUserFeed = async (userId) => {
-  const response = await mlApi.get(`/recommend/feed/${userId}`);
-  return response.data.data;
+  try {
+      const response = await mlApi.get(`/recommend/feed/${userId}`);
+      return response.data;
+  } catch (error) {
+      return [];
+  }
 };
