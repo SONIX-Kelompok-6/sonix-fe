@@ -14,6 +14,7 @@ import imgFlat from '../assets/profile-images/arch-flat.svg';
 import imgNormal from '../assets/profile-images/arch-normal.svg';
 import imgHigh from '../assets/profile-images/arch-high.svg';
 import Footer from "../components/Footer";
+import Navbar from "../components/Navbar";
 
 const BRANDS_LIST = ["ASICS", "Nike", "New Balance", "Adidas", "Saucony", "HOKA", "Brooks", "On", "PUMA", "Altra", "Mizuno", "Salomon", "Under Armour", "Skechers", "Reebok", "Merrell", "Topo Athletic"];
 
@@ -349,7 +350,8 @@ export default function Recommendation() {
   // --- RENDER MENU ---
   if (step === "menu") {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center pt-12" style={gridStyle}>
+      <div className="min-h-screen flex flex-col items-center justify-center pt-30" style={gridStyle}>
+        <Navbar />
         <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl w-[90%] max-w-4xl p-8 border border-gray-100 flex flex-col items-center transition-all duration-500">
           {error && (
             <div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2"><span>{error}</span></div>
@@ -397,7 +399,8 @@ export default function Recommendation() {
   // --- RENDER RESULT PAGE ---
   if (step === "results") {
       return (
-        <div className="min-h-screen p-6 font-sans" style={gridStyle}>
+        <div className="min-h-screen p-6 pt-30 font-sans" style={gridStyle}>
+          <Navbar />
            <div className="max-w-6xl mx-auto">
                <div className="flex flex-col gap-4 mb-6">
                  <div className="flex items-center gap-4">
@@ -518,7 +521,8 @@ export default function Recommendation() {
 
   // --- FORM INPUT ---
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 font-sans animate-in fade-in duration-500" style={gridStyle}>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 pt-30 font-sans animate-in fade-in duration-500" style={gridStyle}>
+      <Navbar />
       <div className="bg-white/90 backdrop-blur-md rounded-xl shadow-2xl w-full max-w-md p-6 relative border border-gray-100">
         {/* 🔥 RESET STORAGE SAAT BACK DARI FORM */}
         <button 

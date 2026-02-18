@@ -5,6 +5,7 @@ import { sendInteraction } from "../services/SonixMl";
 import Navbar from "../components/Navbar";
 import api from "../api/axios";
 import { useShoes } from "../context/ShoeContext"; 
+import Footer from "../components/Footer";
 
 export default function ShoeDetail() {
   const { slug } = useParams();
@@ -298,23 +299,10 @@ export default function ShoeDetail() {
           </div>
         </div>
 
-        <div className="mt-8">
-          <h2 className="text-3xl font-bold text-white text-center mb-6 tracking-wider">EXPLORE</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {shoeData.explore?.map((item) => (
-              <Link to={`/shoe/${item.slug}`} key={item.id} className="bg-[#e9eef5] rounded-xl overflow-hidden shadow-md border-4 border-orange-300 hover:border-orange-500 transition-all group">
-                <div className="p-6 flex items-center justify-center">
-                  <img src={item.image} alt="Explore Shoe" className="max-w-full h-auto group-hover:scale-105 transition-transform duration-300" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-
         {/* --- TECH SPECS MANUAL LAYOUT --- */}
         <div className="mt-12">
           <h2 className="text-3xl font-black text-white text-center mb-8 tracking-widest uppercase">
-            Tech Specs
+            Specification
           </h2>
 
           <div className="bg-white rounded-3xl p-8 shadow-2xl border border-gray-100">
@@ -604,6 +592,7 @@ export default function ShoeDetail() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }
