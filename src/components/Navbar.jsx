@@ -12,39 +12,31 @@ export default function Navbar() {
   const [searchQuery, setSearchQuery] = useState("");
   const isAuthenticated = !!localStorage.getItem("userToken");
 
-  // 1. STATE BARU: Untuk menyimpan username yang sedang login
   const [username, setUsername] = useState("");
 
-  // 2. USE EFFECT BARU: Fetch data user saat Navbar dimuat
-useEffect(() => {
-  const fetchUserData = async () => {
-    const token = localStorage.getItem("userToken");
-    
-    if (token) {
-      try {
-        // GANTI INI: Pakai endpoint profile, JANGAN pakai /api/login/
-        const response = await api.get("/api/user-profile/"); 
-        
-        // Ambil username dari data profile
-        setUsername(response.data.username);
-      } catch (error) {
-        console.error("Gagal ambil data user di Navbar:", error);
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const token = localStorage.getItem("userToken");
+      if (token) {
+        try {
+          const response = await api.get("/api/user-profile/"); 
+          setUsername(response.data.username);
+        } catch (error) {
+          console.error("Gagal ambil data user di Navbar:", error);
+        }
       }
-    }
-  };
+    };
+    fetchUserData();
+  }, [isAuthenticated]);
 
-  fetchUserData();
-}, [isAuthenticated]);
-
-  // 3. LOGIC GAMBAR PROFILE (Dinamis)
-  // Kalau username ada (misal: "Sonic"), pakai API ui-avatars buat bikin gambar huruf "S"
-  // Kalau username kosong, pakai gambar dummy
   const userImage = `https://ui-avatars.com/api/?name=${username}&background=0D8ABC&color=fff&bold=true`; 
 
   const handleSearch = (e) => {
     if (e.key === 'Enter' && searchQuery.trim() !== "") {
       navigate(`/search?q=${searchQuery}`);
       setSearchQuery(""); 
+      // Tutup menu mobile jika search dilakukan dari mobile menu
+      setIsMenuOpen(false);
     }
   };
 
@@ -113,10 +105,10 @@ useEffect(() => {
           ))}
         </div>
 
-        {/* RIGHT SECTION */}
+        {/* RIGHT SECTION (Desktop Search + Profile + Hamburger) */}
         <div className="flex items-center gap-4">
           
-          {/* Search Bar */}
+          {/* DESKTOP SEARCH BAR (Hidden on Mobile) */}
           <div className="relative hidden lg:block">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4">
@@ -133,10 +125,9 @@ useEffect(() => {
             />
           </div>
 
-          {/* DYNAMIC BUTTON (PROFILE / LOGIN) */}
+          {/* DYNAMIC BUTTON (PROFILE / LOGIN) - Desktop & Tablet */}
           {isAuthenticated ? (
             <div className="relative hidden sm:block" ref={dropdownRef}>
-              {/* Avatar Button */}
               <button 
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
                 className="cursor-pointer flex items-center justify-center w-10 h-10 rounded-full border-2 border-blue-600 overflow-hidden transition hover:shadow-md focus:outline-none"
@@ -148,18 +139,13 @@ useEffect(() => {
                 />
               </button>
 
-              {/* Dropdown Menu */}
               {isProfileOpen && (
                 <div className="absolute right-0 mt-3 w-48 origin-top-right bg-[#1e2a4a] rounded-xl shadow-xl border border-blue-800/50 text-white animate-in fade-in slide-in-from-top-2">
                   <div className="absolute -top-1 right-3 w-3 h-3 bg-[#1e2a4a] rotate-45 border-l border-t border-blue-800/50"></div>
-                  
                   <div className="flex flex-col py-2">
-                    
-                    {/* 4. TAMBAHAN: Nama User di Dropdown */}
                     <div className="px-4 py-2 text-xs text-gray-400 border-b border-gray-600 mb-1">
                       Hi, {username || "Runner"}
                     </div>
-
                     <Link 
                       to="/account" 
                       className="px-4 py-2 text-sm font-medium hover:bg-blue-800 transition text-center"
@@ -167,9 +153,7 @@ useEffect(() => {
                     >
                       Account
                     </Link>
-                    
                     <div className="h-px bg-gray-600/50 mx-4 my-1"></div>
-                    
                     <button 
                       onClick={handleLogout}
                       className="px-4 py-2 text-sm font-medium hover:bg-blue-800 transition text-center text-red-300 hover:text-red-200"
@@ -189,7 +173,7 @@ useEffect(() => {
             </Link>
           )}
 
-          {/* HAMBURGER BUTTON (Mobile) */}
+          {/* HAMBURGER BUTTON (Mobile Only) */}
           <button 
             className="md:hidden p-2 text-gray-600 transition hover:text-blue-600"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -206,9 +190,27 @@ useEffect(() => {
           </button>
         </div>
 
-        {/* MOBILE MENU */}
+        {/* MOBILE MENU DROPDOWN */}
         {isMenuOpen && (
-          <div className="absolute top-full left-0 mt-2 w-full origin-top-right rounded-2xl bg-white/90 p-4 shadow-xl backdrop-blur-xl border border-white/20 md:hidden flex flex-col gap-4 animate-in fade-in slide-in-from-top-5">
+          <div className="absolute top-full left-0 mt-2 w-full origin-top-right rounded-2xl bg-white/95 p-5 shadow-xl backdrop-blur-xl border border-white/20 md:hidden flex flex-col gap-4 animate-in fade-in slide-in-from-top-5">
+              
+              {/* --- SEARCH BAR KHUSUS MOBILE --- */}
+              <div className="relative w-full lg:hidden mb-2">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                  </svg>
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search shoes..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={handleSearch}
+                  className="w-full rounded-xl bg-gray-100 py-3 pl-10 pr-4 text-sm font-medium text-gray-800 placeholder-gray-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 border border-gray-200"
+                />
+              </div>
+
              {menuItems.map((item) => (
                 <Link
                   key={item.name}
@@ -219,15 +221,16 @@ useEffect(() => {
                   {item.name}
                 </Link>
               ))}
-              <hr className="border-gray-200" />
+              <hr className="border-gray-200 my-1" />
               
               {isAuthenticated ? (
                 <>
                   <Link 
                     to="/account"
                     onClick={() => setIsMenuOpen(false)}
-                    className="flex w-full items-center justify-center rounded-full bg-gray-100 py-2 text-sm font-bold text-gray-700 hover:bg-gray-200 mb-2"
+                    className="flex w-full items-center justify-center gap-2 rounded-full bg-blue-50 py-3 text-sm font-bold text-blue-900 hover:bg-blue-100 mb-2 border border-blue-100"
                   >
+                     <img src={userImage} alt="" className="w-5 h-5 rounded-full" />
                     Account ({username})
                   </Link>
                   <button 
@@ -235,7 +238,7 @@ useEffect(() => {
                       setIsMenuOpen(false);
                       handleLogout();
                     }}
-                    className="flex w-full items-center justify-center rounded-full bg-red-600 py-2 text-sm font-bold text-white hover:bg-red-700"
+                    className="flex w-full items-center justify-center rounded-full bg-red-500 py-3 text-sm font-bold text-white hover:bg-red-600 shadow-sm"
                   >
                     Logout
                   </button>
@@ -244,7 +247,7 @@ useEffect(() => {
                 <Link 
                   to="/login"
                   onClick={() => setIsMenuOpen(false)}
-                  className="flex w-full items-center justify-center rounded-full bg-[#0a0a5c] py-2 text-sm font-bold text-white hover:bg-blue-900"
+                  className="flex w-full items-center justify-center rounded-full bg-[#0a0a5c] py-3 text-sm font-bold text-white hover:bg-blue-900 shadow-md"
                 >
                   Login
                 </Link>
