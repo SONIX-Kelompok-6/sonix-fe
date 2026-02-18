@@ -14,9 +14,28 @@ export default function Contact() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Logika kirim pesan disini
-    console.log("Form Submitted", formData);
-    alert("Thank you! Your message has been sent.");
+    
+    // 1. Ambil data dari form
+    const { name, email, subject, message } = formData;
+
+    // 2. Format Isi Pesan agar rapi saat dibuka di Gmail
+    // Kita sertakan email pengirim di dalam body pesan, 
+    // karena kita mengirim lewat akun Gmail pribadi user.
+    const emailBody = `Name: ${name}\nUser Email: ${email}\n\nMessage:\n${message}`;
+
+    // 3. Buat Link Khusus Gmail Web (Compose Mode)
+    // view=cm (Compose Mode)
+    // fs=1 (Fullscreen)
+    // to (Tujuan)
+    // su (Subject)
+    // body (Isi Pesan)
+    const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=sonix.rush.ai@gmail.com&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
+
+    // 4. Buka Gmail di Tab Baru
+    window.open(gmailLink, '_blank');
+    
+    // Opsional: Reset form setelah membuka tab
+    // setFormData({ name: "", email: "", subject: "", message: "" });
   };
 
   return (
@@ -29,7 +48,7 @@ export default function Contact() {
         {/* BAGIAN KIRI: Informasi Kontak (Navy Blue Background) */}
         <div className="bg-[#010038] p-10 md:p-14 text-white flex flex-col justify-between relative overflow-hidden">
           
-          {/* Hiasan Lingkaran Abstrak (Opsional, untuk estetika) */}
+          {/* Hiasan Lingkaran Abstrak */}
           <div className="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white opacity-5 rounded-full blur-2xl"></div>
           <div className="absolute bottom-0 left-0 -ml-10 -mb-10 w-40 h-40 bg-white opacity-5 rounded-full blur-2xl"></div>
 
@@ -140,7 +159,7 @@ export default function Contact() {
               type="submit" 
               className="w-full text-white bg-[#010038] hover:bg-blue-900 focus:ring-4 focus:outline-none focus:ring-blue-300 font-bold rounded-xl text-lg px-5 py-4 text-center transition-all shadow-lg hover:shadow-xl active:scale-95"
             >
-              Send Message
+              Send
             </button>
           </form>
         </div>
@@ -148,4 +167,4 @@ export default function Contact() {
       </div>
     </div>
   );
-}   
+}
