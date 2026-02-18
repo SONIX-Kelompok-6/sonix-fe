@@ -62,7 +62,7 @@ const Home = () => {
               // A. Ambil List ID dari ML (Contoh: ["R158", "R002"])
               const idList = await getUserFeed(userId);
               
-              // B. 🔥 HYDRATION: Ganti ID jadi Object Sepatu Lengkap 🔥
+              // B. HYDRATION: Ganti ID jadi Object Sepatu Lengkap 
               if (idList && idList.length > 0) {
                 // Handle jika response dibungkus object atau array langsung
                 const rawIds = Array.isArray(idList) ? idList : (idList.data || []);
@@ -96,7 +96,7 @@ const Home = () => {
           fetchData();
       }
     }
-  }, [allShoes.length]); // 🔥 Re-run saat data sepatu di context selesai loading
+  }, [allShoes.length]); // Re-run saat data sepatu di context selesai loading
 
   // --- 3. OBSERVER SCROLL ---
   useEffect(() => {
@@ -137,71 +137,112 @@ const Home = () => {
       {/* =========================================================================
           SECTION 1: HERO SECTION
       ========================================================================= */}
-      <section className="relative w-full min-h-screen relative overflow-hidden">
-        <div className="absolute inset-0 w-full h-full z-0 pointer-events-none">
-          <svg className="w-full h-full" viewBox="0 0 1340 900" fill="none" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M 950 0 C 350 300 1000 650 0 900 H 1440 V 0 Z" fill="#010038" transform="translate(-40, 10)" />
-            <path d="M 950 0 C 350 300 1000 650 0 900 H 1440 V 0 Z" fill="#293A80" transform="translate(-20, 0)" />
-            <path d="M 990 0 C 350 300 1000 650 0 950 H 1440 V 0 Z" fill="#537EC5" />
-          </svg>
-        </div>
+      <section className="relative w-full min-h-screen relative overflow-hidden bg-white lg:bg-transparent">
+              {/* BACKGROUND SVG:
+                  Tambahkan 'hidden lg:block' agar di HP backgroundnya putih bersih (hilangkan ombak biru),
+                  tapi di Desktop (lg) ombaknya muncul kembali.
+              */}
+              <div className="absolute inset-0 w-full h-full z-0 pointer-events-none hidden lg:block">
+                <svg className="w-full h-full" viewBox="0 0 1340 900" fill="none" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M 950 0 C 350 300 1000 650 0 900 H 1440 V 0 Z" fill="#010038" transform="translate(-40, 10)" />
+                  <path d="M 950 0 C 350 300 1000 650 0 900 H 1440 V 0 Z" fill="#293A80" transform="translate(-20, 0)" />
+                  <path d="M 990 0 C 350 300 1000 650 0 950 H 1440 V 0 Z" fill="#537EC5" />
+                </svg>
+              </div>
 
-        <div className="relative z-10 w-full max-w-[1800px] mx-auto grid grid-cols-1 lg:grid-cols-2 min-h-screen items-center px-6 pb-20">
-          <div className="pl-4 md:pl-16 lg:pl-2 pt-32 lg:pt-45 z-30 animate-in slide-in-from-left duration-700">
-            <div className="relative -mt-68 mb-6">
-                <p className="absolute top-44 left-22 text-[#293A80] font-bold tracking-[0.25em] text-2xl uppercase">WE ARE</p>
-                <div className="flex justify-start -ml-3">
-                  <img src={rushLogo} alt="RUSH Logo" className="w-[280px] md:w-[380px] lg:w-[450px] object-contain" />
-                </div>
-            </div>
-            <p className="absolute top-91 left-30 text-[#010038]/80 text-xl leading-relaxed max-w-md font-medium">
-              Personalized shoe recommendations <br/>to help you find the perfect match <br/>for every run.
-            </p>
-            <div className="relative left-20 pt-15">
-              <Link to="/recommendation">
-                <button className="bg-[#293A80] text-white px-12 py-4 rounded-full font-bold tracking-widest shadow-2xl hover:bg-[#010038] hover:scale-105 transition transform duration-300 text-base md:text-lg ring-4 ring-[#293A80]/20">
-                  TRY NOW
-                </button>
-              </Link>
-            </div>
-          </div>
-
-          <div className="relative w-full h-full flex items-center justify-center overflow-visible mt-10 lg:mt-40">
-            <div className="absolute -left-50 inset-0 z-19 flex items-center justify-end pointer-events-none">
-               <div className="w-[85%] h-full relative ">
-                  <img src={runnerImg} alt="Runner Overlay" className="w-full h-full object-cover object-top opacity-100 mix-blend-overlay contrast-125 scale-150 translate-x-10"/>
-               </div>
-            </div>
-            <div className="absolute right-[-1rem] lg:right-[-11rem] top-[45%] -translate-y-1/2 z-20 select-none pointer-events-none">
-               <h2 className="text-[100px] md:text-[140px] lg:text-[99px] font-black -rotate-90 tracking-widest flex items-center gap-0 opacity-100 leading-none">
-                  <span className="text-[#293A80]">R</span>
-                  <span className="text-white">U</span>
-                  <span className="text-[#293A80]">N</span>
-                  <span className="text-[#293A80]">N</span>
-                  <span className="text-white">I</span>
-                  <span className="text-[#293A80]">N</span>
-                  <span className="text-white">G</span>
-               </h2>
-            </div>
-            <div className="relative z-20 -ml-[20%] lg:-ml-[30%] -mt-10 lg:-mt-40 w-full flex justify-center">
-               <img src={shoeImg} alt="Running Shoe" className="w-[135%] md:w-[800px] lg:w-[1200px] max-w-none -rotate-[5deg]"/>
-               <div className="hidden lg:flex flex-col absolute bottom-[2%] right-[20%] items-end">
-                  <div className="flex items-center gap-4">
-                      <div className="w-24 h-[2px] bg-white/80 relative shadow-sm"><div className="absolute left-0 bottom-0 w-[1px] h-15 bg-white/80 shadow-sm"></div></div>
-                      <div className="text-left drop-shadow-md">
-                          <p className="text-white text-xs font-bold tracking-[0.2em] uppercase opacity-90 mb-1">FIND YOUR RUSH IN</p>
-                          <p className="text-[#F39422] text-2xl font-black tracking-wider drop-shadow-sm bg-white/10 backdrop-blur-sm px-2 rounded">THE RIGHT SHOES</p>
+              {/* MAIN CONTAINER:
+                  Di Mobile: Flex column & Centered (agar konten rapi di tengah).
+                  Di Desktop: Grid 2 kolom.
+              */}
+              <div className="relative z-10 w-full max-w-[1800px] mx-auto grid grid-cols-1 lg:grid-cols-2 min-h-screen items-center px-6 pb-20 pt-20 lg:pt-0">
+                
+                {/* KOLOM KIRI (TEKS):
+                  Di Mobile: flex col, items-center (tengah), text-center.
+                  Di Desktop: block, text-left.
+                */}
+                <div className="flex flex-col items-center text-center lg:block lg:text-left pl-0 md:pl-16 lg:pl-2 pt-10 lg:pt-45 z-30 animate-in slide-in-from-left duration-700">
+                  
+                  <div className="relative mb-6 flex flex-col items-center lg:block lg:-mt-68">
+                      {/* TEXT "WE ARE":
+                          Di Mobile: Static (relative), margin bottom, centered.
+                          Di Desktop: Absolute positioning dikembalikan.
+                      */}
+                      <p className="relative mb-8 lg:mb-0 lg:absolute lg:top-44 lg:left-22 text-[#293A80] font-bold tracking-[0.25em] text-2xl uppercase">
+                          WE ARE
+                      </p>
+                      
+                      {/* LOGO CONTAINER */}
+                      <div className="flex justify-center lg:justify-start lg:-ml-3">
+                        <img src={rushLogo} alt="RUSH Logo" className="w-[200px] md:w-[380px] lg:w-[450px] object-contain" />
                       </div>
                   </div>
-               </div>
-            </div>
-          </div>
-        </div>
-        <div className="absolute bottom-0 left-0 w-full z-20 pointer-events-none">
-           <svg viewBox="0 0 1440 160" className="w-full h-auto min-h-[120px]" preserveAspectRatio="none">
-               <path fill={isLoggedIn && userFeed.length > 0 ? "#F8FAFC" : "#F8FAFC"} ></path>
-           </svg>
-        </div>
+
+                  {/* DESKRIPSI:
+                      Hapus absolute di mobile, gunakan mx-auto agar teks paragraf rata tengah.
+                  */}
+                  <p className="relative mt-6 lg:mt-0 lg:absolute lg:top-91 lg:left-30 text-[#010038]/80 text-lg md:text-xl leading-relaxed max-w-md font-medium mx-auto lg:mx-0">
+                    Personalized shoe recommendations <br className="hidden lg:block"/>
+                    to help you find the perfect match <br className="hidden lg:block"/>
+                    for every run.
+                  </p>
+
+                  {/* BUTTON CONTAINER */}
+                  <div className="relative mt-12 lg:mt-0 lg:left-20 lg:pt-15">
+                    <Link to="/recommendation">
+                      <button className="bg-[#293A80] text-white px-12 py-4 rounded-full font-bold tracking-widest shadow-2xl hover:bg-[#010038] hover:scale-105 transition transform duration-300 text-base md:text-lg ring-4 ring-[#293A80]/20">
+                        TRY NOW
+                      </button>
+                    </Link>
+                  </div>
+                </div>
+
+                {/* KOLOM KANAN (GAMBAR SEPATU & RUNNER):
+                  Jika kamu ingin tampilan mobile PERSIS gambar referensi (hanya teks),
+                  tambahkan 'hidden lg:flex' pada div ini.
+                  
+                  Jika ingin gambar sepatu tetap ada tapi di bawah teks, biarkan saja (default flex column).
+                  Di sini saya biarkan tampil tapi diatur agar tidak menumpuk teks di mobile.
+                */}
+                <div className="relative w-full h-full flex items-center justify-center overflow-visible mt-20 lg:mt-40 hidden lg:flex">
+                  <div className="absolute -left-50 inset-0 z-19 flex items-center justify-end pointer-events-none">
+                    <div className="w-[85%] h-full relative ">
+                        <img src={runnerImg} alt="Runner Overlay" className="w-full h-full object-cover object-top opacity-100 mix-blend-overlay contrast-125 scale-150 translate-x-10"/>
+                    </div>
+                  </div>
+                  <div className="absolute right-[-1rem] lg:right-[-11rem] top-[45%] -translate-y-1/2 z-20 select-none pointer-events-none">
+                    <h2 className="text-[100px] md:text-[140px] lg:text-[99px] font-black -rotate-90 tracking-widest flex items-center gap-0 opacity-100 leading-none">
+                        <span className="text-[#293A80]">R</span>
+                        <span className="text-white">U</span>
+                        <span className="text-[#293A80]">N</span>
+                        <span className="text-[#293A80]">N</span>
+                        <span className="text-white">I</span>
+                        <span className="text-[#293A80]">N</span>
+                        <span className="text-white">G</span>
+                    </h2>
+                  </div>
+                  <div className="relative z-20 -ml-[20%] lg:-ml-[30%] -mt-10 lg:-mt-40 w-full flex justify-center">
+                    <img src={shoeImg} alt="Running Shoe" className="w-[135%] md:w-[800px] lg:w-[1200px] max-w-none -rotate-[5deg]"/>
+                    
+                    {/* Label kecil di bawah kanan (desktop only) */}
+                    <div className="hidden lg:flex flex-col absolute bottom-[2%] right-[20%] items-end">
+                        <div className="flex items-center gap-4">
+                            <div className="w-24 h-[2px] bg-white/80 relative shadow-sm"><div className="absolute left-0 bottom-0 w-[1px] h-15 bg-white/80 shadow-sm"></div></div>
+                            <div className="text-left drop-shadow-md">
+                                <p className="text-white text-xs font-bold tracking-[0.2em] uppercase opacity-90 mb-1">FIND YOUR RUSH IN</p>
+                                <p className="text-[#F39422] text-2xl font-black tracking-wider drop-shadow-sm bg-white/10 backdrop-blur-sm px-2 rounded">THE RIGHT SHOES</p>
+                            </div>
+                        </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SVG FOOTER WAVE */}
+              <div className="absolute bottom-0 left-0 w-full z-20 pointer-events-none hidden lg:block">
+                <svg viewBox="0 0 1440 160" className="w-full h-auto min-h-[120px]" preserveAspectRatio="none">
+                    <path fill={isLoggedIn && userFeed.length > 0 ? "#F8FAFC" : "#F8FAFC"} ></path>
+                </svg>
+              </div>
       </section>
 
       {/* =========================================================================
@@ -272,12 +313,14 @@ const Home = () => {
       {/* =========================================================================
           SECTION 2: PARTS OF SHOES
       ========================================================================= */}
-      <section 
+<section 
         ref={sectionRef} 
-        className="relative w-full min-h-[120vh] bg-slate-50 flex items-center justify-center overflow-hidden py-24">
+        className="relative w-full min-h-[100vh] md:min-h-[120vh] bg-slate-50 flex items-center justify-center overflow-hidden py-16 md:py-24">
         
+        {/* Gradient Overlay Top */}
         <div className="absolute top-0 left-0 w-full h-40 bg-gradient-to-b from-[#537EC5]/20 to-transparent pointer-events-none z-0"></div>
 
+        {/* Grid Background Pattern */}
         <div className="absolute inset-0 z-0 opacity-40 pointer-events-none" 
              style={{ 
                  backgroundImage: 'linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(90deg, #cbd5e1 1px, transparent 1px)', 
@@ -285,9 +328,19 @@ const Home = () => {
              }}>
         </div>
 
-        <div className="relative w-full max-w-5xl h-[600px] flex items-center justify-center">
-            {/* BACKGROUND STRIPES */}
-            <div className="absolute z-0 flex flex-col gap-3 -rotate-[15deg] origin-bottom-left translate-y-[-33%] translate-x-[70%]">
+        {/* Main Container */}
+        <div className="relative w-full max-w-5xl min-h-[500px] md:h-[600px] flex flex-col md:flex-row items-center justify-center">
+            
+            {/* --- MOBILE HEADER (Hanya muncul di Mobile) --- */}
+            <div className="md:hidden z-20 text-center mb-12 animate-in slide-in-from-bottom-4 duration-700">
+                <h2 className="text-[#293A80] font-black text-4xl tracking-wider drop-shadow-sm">
+                    PARTS <span className="text-[#F39422]">OF</span> SHOES
+                </h2>
+                <div className="h-1.5 w-24 bg-[#537EC5] mx-auto mt-3 rounded-full"></div>
+            </div>
+
+            {/* --- DESKTOP BACKGROUND STRIPES (Disembunyikan di Mobile: hidden md:flex) --- */}
+            <div className="hidden md:flex absolute z-0 flex-col gap-3 -rotate-[15deg] origin-bottom-left translate-y-[-33%] translate-x-[70%]">
                 <div className="w-[500px] md:w-[700px] h-16 md:h-24 bg-[#F39422] flex items-center pl-30 md:pl-40 rounded-r-full shadow-sm overflow-hidden">
                     <h2 className={`text-white font-black text-4xl md:text-6xl tracking-wider drop-shadow-sm transition-all duration-1000 ease-out ${isVisible ? 'translate-x-0 opacity-100' : 'translate-x-[200px] opacity-0'}`}>PARTS</h2>
                 </div>
@@ -299,52 +352,86 @@ const Home = () => {
                 </div>
             </div>
 
-            {/* GAMBAR SEPATU UTAMA + HOTSPOTS */}
+{/* GAMBAR SEPATU UTAMA + HOTSPOTS */}
             <div 
-                className="relative z-10 w-[350px] md:w-[600px] aspect-square flex items-center justify-center"
+                className="relative z-10 w-[320px] xs:w-[350px] md:w-[600px] aspect-square flex items-center justify-center"
                 onClick={() => setActivePoint(null)}
             >
                 <img src={partOfShoeImg} alt="Parts of Shoes Diagram" className="w-full h-full object-contain drop-shadow-2xl"/>
                 
-                {shoeParts.map((part) => (
-                    <div 
-                        key={part.id} 
-                        className="absolute w-8 h-8 flex items-center justify-center z-50" 
-                        style={{ top: part.top, left: part.left }}
-                    >
-                        <div 
-                            className="relative w-8 h-8 flex items-center justify-center cursor-pointer group" 
-                            onClick={(e) => {
-                                e.stopPropagation(); 
-                                setActivePoint(activePoint === part.id ? null : part.id);
-                            }}
-                        >
-                             {activePoint !== part.id && (<span className="absolute inline-flex h-full w-full rounded-full bg-[#537EC5] opacity-60 animate-ping"></span>)}
-                             <span className={`relative inline-flex rounded-full transition-all duration-300 border-2 shadow-lg ${activePoint === part.id ? 'h-5 w-5 bg-[#F39422] border-white ring-4 ring-[#F39422]/30' : 'h-4 w-4 bg-white border-[#537EC5] group-hover:scale-125'}`}></span>
-                        </div>
+                {shoeParts.map((part) => {
+                    // Logic sederhana untuk menentukan arah popup di mobile agar tidak keluar layar
+                    // Jika posisi titik < 50% (kiri), popup geser ke kanan (left-0)
+                    // Jika posisi titik > 50% (kanan), popup geser ke kiri (right-0)
+                    const isLeftSide = parseFloat(part.left) < 50;
 
-                        {/* Tooltip */}
-                        {activePoint === part.id && (
+                    return (
+                        <div 
+                            key={part.id} 
+                            className="absolute w-8 h-8 flex items-center justify-center z-50" 
+                            style={{ top: part.top, left: part.left }}
+                        >
+                            {/* Hotspot Dot (Titik) */}
                             <div 
-                                className={`absolute top-1/2 -translate-y-1/2 flex items-center cursor-default w-[400px] ${part.align === 'left' ? 'flex-row right-6 justify-end' : 'flex-row-reverse left-6 justify-end'}`}
-                                onClick={(e) => e.stopPropagation()} 
+                                className="relative w-8 h-8 flex items-center justify-center cursor-pointer group" 
+                                onClick={(e) => {
+                                    e.stopPropagation(); 
+                                    setActivePoint(activePoint === part.id ? null : part.id);
+                                }}
                             >
-                                <div className={`bg-white/95 backdrop-blur-md p-2 rounded-[2rem] shadow-2xl border border-white/50 animate-in fade-in zoom-in duration-300 flex items-center gap-4 ${part.align === 'left' ? 'flex-row' : 'flex-row-reverse text-right'}`}>
-                                    <div className="flex flex-col justify-center min-w-[120px] px-2">
-                                        <h3 className="text-[#F39422] font-black text-lg md:text-xl uppercase leading-none mb-1">{part.title}</h3>
-                                        <p className="text-[#010038]/70 text-xs font-medium leading-snug max-w-[150px]">{part.desc}</p>
-                                    </div>
-                                    <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-white shadow-lg overflow-hidden bg-gray-100 relative shrink-0">
-                                        <img src={part.img} alt={part.title} className="w-full h-full object-cover" />
-                                    </div>
-                                </div>
-                                <div className="w-8 md:w-16 h-[2px] bg-[#F39422] relative mx-2">
-                                     <div className={`absolute w-1.5 h-1.5 bg-[#F39422] rounded-full top-1/2 -translate-y-1/2 ${part.align === 'left' ? '-left-1' : '-right-1'}`}></div>
-                                </div>
+                                {/* Ping Animation */}
+                                {activePoint !== part.id && (
+                                    <span className="absolute inline-flex h-full w-full rounded-full bg-[#537EC5] opacity-60 animate-ping"></span>
+                                )}
+                                {/* Core Dot */}
+                                <span className={`relative inline-flex rounded-full transition-all duration-300 border-2 shadow-lg ${activePoint === part.id ? 'h-6 w-6 bg-[#F39422] border-white ring-4 ring-[#F39422]/30' : 'h-4 w-4 bg-white border-[#537EC5] group-hover:scale-125'}`}></span>
                             </div>
-                        )}
-                    </div>
-                ))}
+
+                            {/* --- POPUP CARD (TOOLTIP) --- */}
+                            {activePoint === part.id && (
+                                <div 
+                                    className={`absolute top-full mt-3 z-[60] cursor-default
+                                    /* MOBILE STYLES: Width fixed, Smart Position */
+                                    w-[240px] ${isLeftSide ? 'left-[-10px]' : 'right-[-10px]'}
+                                    
+                                    /* DESKTOP STYLES: Balik ke style connector line */
+                                    md:w-[400px] md:top-1/2 md:mt-0 md:-translate-y-1/2 md:auto
+                                    md:${part.align === 'left' ? 'right-8 left-auto' : 'left-8 right-auto'}
+                                    `}
+                                    onClick={(e) => e.stopPropagation()} 
+                                >
+                                    <div className={`
+                                        relative bg-white/90 backdrop-blur-xl p-3 md:p-4 rounded-2xl shadow-2xl border border-white/60 
+                                        flex items-center gap-3 animate-in fade-in zoom-in-95 duration-300 slide-in-from-top-2
+                                        ${part.align === 'left' ? 'md:flex-row' : 'md:flex-row-reverse md:text-right'}
+                                    `}>
+                                        
+                                        {/* Segitiga Kecil (Pointer) - Hanya di Mobile */}
+                                        <div className={`md:hidden absolute -top-2 w-4 h-4 bg-white rotate-45 border-t border-l border-white/60 ${isLeftSide ? 'left-4' : 'right-4'}`}></div>
+
+                                        {/* Gambar Thumbnail */}
+                                        <div className="w-14 h-14 md:w-20 md:h-20 rounded-full border-2 md:border-4 border-white shadow-md overflow-hidden bg-gray-100 shrink-0">
+                                            <img src={part.img} alt={part.title} className="w-full h-full object-cover" />
+                                        </div>
+
+                                        {/* Teks Konten */}
+                                        <div className="flex flex-col flex-1 min-w-0">
+                                            <h3 className="text-[#F39422] font-extrabold text-sm md:text-xl uppercase leading-none mb-1">{part.title}</h3>
+                                            <p className="text-[#293A80]/80 text-[11px] md:text-xs font-semibold leading-tight">{part.desc}</p>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Garis Konektor (Hanya Desktop) */}
+                                    <div className={`hidden md:block absolute top-1/2 -translate-y-1/2 w-8 h-[2px] bg-[#F39422] 
+                                        ${part.align === 'left' ? '-right-8' : '-left-8'}
+                                    `}>
+                                         <div className={`absolute w-1.5 h-1.5 bg-[#F39422] rounded-full top-1/2 -translate-y-1/2 ${part.align === 'left' ? '-left-0' : '-right-0'}`}></div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
         </div>
       </section>
