@@ -137,8 +137,10 @@ const Home = () => {
       {/* =========================================================================
           SECTION 1: HERO SECTION
       ========================================================================= */}
-      <section className="relative w-full min-h-screen relative overflow-hidden">
-        <div className="absolute inset-0 w-full h-full z-0 pointer-events-none">
+    <section className="relative w-full min-h-screen overflow-hidden flex flex-col">
+        {/* 1. Background SVG (Kurva) */}
+        {/* UPDATE: Ditambahkan 'hidden lg:block' agar hilang di mobile */}
+        <div className="absolute inset-0 w-full h-full z-0 pointer-events-none hidden lg:block">
           <svg className="w-full h-full" viewBox="0 0 1340 900" fill="none" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M 950 0 C 350 300 1000 650 0 900 H 1440 V 0 Z" fill="#010038" transform="translate(-40, 10)" />
             <path d="M 950 0 C 350 300 1000 650 0 900 H 1440 V 0 Z" fill="#293A80" transform="translate(-20, 0)" />
@@ -146,34 +148,57 @@ const Home = () => {
           </svg>
         </div>
 
-        <div className="relative z-10 w-full max-w-[1800px] mx-auto grid grid-cols-1 lg:grid-cols-2 min-h-screen items-center px-6 pb-20">
-          <div className="pl-4 md:pl-16 lg:pl-2 pt-32 lg:pt-45 z-30 animate-in slide-in-from-left duration-700">
-            <div className="relative -mt-68 mb-6">
-                <p className="absolute top-44 left-22 text-[#293A80] font-bold tracking-[0.25em] text-2xl uppercase">WE ARE</p>
-                <div className="flex justify-start -ml-3">
-                  <img src={rushLogo} alt="RUSH Logo" className="w-[280px] md:w-[380px] lg:w-[450px] object-contain" />
+        {/* CONTAINER UTAMA */}
+        <div className="relative z-10 w-full max-w-[1800px] mx-auto grid grid-cols-1 lg:grid-cols-2 min-h-screen items-center px-6 pb-20 pt-20 lg:pt-0">
+          
+          {/* --- KOLOM KIRI (TEXT & LOGO) --- */}
+          <div className="flex flex-col items-center text-center lg:block lg:text-left pl-0 lg:pl-2 pt-0 lg:pt-45 z-30 animate-in slide-in-from-left duration-700 order-1">
+            
+            {/* Wrapper Logo & Text "WE ARE" */}
+            <div className="relative mb-6 lg:-mt-68 w-full">
+                <p className="block mb-2 lg:absolute lg:top-44 lg:left-22 text-[#293A80] font-bold tracking-[0.25em] text-xl lg:text-2xl uppercase">
+                  WE ARE
+                </p>
+                
+                <div className="flex justify-center lg:justify-start lg:-ml-3">
+                  <img src={rushLogo} alt="RUSH Logo" className="w-[200px] md:w-[380px] lg:w-[450px] object-contain" />
                 </div>
             </div>
-            <p className="absolute top-91 left-30 text-[#010038]/80 text-xl leading-relaxed max-w-md font-medium">
-              Personalized shoe recommendations <br/>to help you find the perfect match <br/>for every run.
-            </p>
-            <div className="relative left-20 pt-15">
+
+            {/* Description Paragraph */}
+            <div className="relative w-full flex justify-center lg:block">
+                <p className="static lg:absolute lg:top-91 lg:left-30 text-[#010038]/80 text-lg lg:text-xl leading-relaxed max-w-md font-medium px-4 lg:px-0">
+                  Personalized shoe recommendations <br className="hidden lg:block"/>
+                  to help you find the perfect match <br className="hidden lg:block"/>
+                  for every run.
+                </p>
+            </div>
+
+            {/* Button Container */}
+            <div className="relative mt-8 lg:mt-0 lg:left-20 lg:pt-15 w-full flex justify-center lg:justify-start">
               <Link to="/recommendation">
-                <button className="bg-[#293A80] text-white px-12 py-4 rounded-full font-bold tracking-widest shadow-2xl hover:bg-[#010038] hover:scale-105 transition transform duration-300 text-base md:text-lg ring-4 ring-[#293A80]/20">
+                <button className="bg-[#293A80] text-white px-10 py-3 lg:px-12 lg:py-4 rounded-full font-bold tracking-widest shadow-2xl hover:bg-[#010038] hover:scale-105 transition transform duration-300 text-sm md:text-lg ring-4 ring-[#293A80]/20">
                   TRY NOW
                 </button>
               </Link>
             </div>
           </div>
 
-          <div className="relative w-full h-full flex items-center justify-center overflow-visible mt-10 lg:mt-40">
-            <div className="absolute -left-50 inset-0 z-19 flex items-center justify-end pointer-events-none">
-               <div className="w-[85%] h-full relative ">
-                  <img src={runnerImg} alt="Runner Overlay" className="w-full h-full object-cover object-top opacity-100 mix-blend-overlay contrast-125 scale-150 translate-x-10"/>
-               </div>
+          {/* --- KOLOM KANAN (IMAGE & OVERLAY) --- */}
+          <div className="relative w-full h-full flex items-center justify-center overflow-visible mt-12 lg:mt-40 order-2">
+            
+            {/* 2. Runner Overlay (Foto Runner Img) */}
+            {/* UPDATE: Diubah jadi 'hidden lg:flex' agar hilang di mobile */}
+            <div className="hidden lg:flex absolute -left-10 lg:-left-50 inset-0 z-19 items-center justify-end pointer-events-none opacity-30 lg:opacity-100">
+              <div className="w-full lg:w-[85%] h-full relative">
+                  <img src={runnerImg} alt="Runner Overlay" className="w-full h-full object-cover object-top mix-blend-overlay contrast-125 scale-100 lg:scale-150 lg:translate-x-10"/>
+              </div>
             </div>
-            <div className="absolute right-[-1rem] lg:right-[-11rem] top-[45%] -translate-y-1/2 z-20 select-none pointer-events-none">
-               <h2 className="text-[100px] md:text-[140px] lg:text-[99px] font-black -rotate-90 tracking-widest flex items-center gap-0 opacity-100 leading-none">
+
+            {/* 3. Big Text "RUNNING" */}
+            {/* UPDATE: Ditambahkan 'hidden lg:block' agar hilang di mobile */}
+            <div className="hidden lg:block absolute right-0 lg:right-[-11rem] top-[50%] lg:top-[45%] -translate-y-1/2 z-20 select-none pointer-events-none">
+              <h2 className="text-[60px] md:text-[100px] lg:text-[99px] font-black -rotate-90 tracking-widest flex items-center gap-0 opacity-100 leading-none">
                   <span className="text-[#293A80]">R</span>
                   <span className="text-white">U</span>
                   <span className="text-[#293A80]">N</span>
@@ -181,11 +206,15 @@ const Home = () => {
                   <span className="text-white">I</span>
                   <span className="text-[#293A80]">N</span>
                   <span className="text-white">G</span>
-               </h2>
+              </h2>
             </div>
-            <div className="relative z-20 -ml-[20%] lg:-ml-[30%] -mt-10 lg:-mt-40 w-full flex justify-center">
-               <img src={shoeImg} alt="Running Shoe" className="w-[135%] md:w-[800px] lg:w-[1200px] max-w-none -rotate-[5deg]"/>
-               <div className="hidden lg:flex flex-col absolute bottom-[2%] right-[20%] items-end">
+
+            {/* Shoe Image (Sepatu Utama Tetap Ada) */}
+            <div className="relative z-20 ml-0 lg:-ml-[30%] mt-0 lg:-mt-40 w-full flex justify-center">
+              <img src={shoeImg} alt="Running Shoe" className="w-[90%] md:w-[600px] lg:w-[1200px] max-w-none -rotate-[5deg] drop-shadow-2xl"/>
+              
+              {/* Floating box (Hidden on mobile, visible desktop) */}
+              <div className="hidden lg:flex flex-col absolute bottom-[2%] right-[20%] items-end">
                   <div className="flex items-center gap-4">
                       <div className="w-24 h-[2px] bg-white/80 relative shadow-sm"><div className="absolute left-0 bottom-0 w-[1px] h-15 bg-white/80 shadow-sm"></div></div>
                       <div className="text-left drop-shadow-md">
@@ -193,80 +222,19 @@ const Home = () => {
                           <p className="text-[#F39422] text-2xl font-black tracking-wider drop-shadow-sm bg-white/10 backdrop-blur-sm px-2 rounded">THE RIGHT SHOES</p>
                       </div>
                   </div>
-               </div>
+              </div>
             </div>
           </div>
         </div>
-        <div className="absolute bottom-0 left-0 w-full z-20 pointer-events-none">
-           <svg viewBox="0 0 1440 160" className="w-full h-auto min-h-[120px]" preserveAspectRatio="none">
-               <path fill={isLoggedIn && userFeed.length > 0 ? "#F8FAFC" : "#F8FAFC"} ></path>
-           </svg>
+
+        {/* 4. Bottom Curve Divider */}
+        {/* UPDATE: Ditambahkan 'hidden lg:block' jika kamu ingin kurva bawah juga hilang di mobile */}
+        <div className="absolute bottom-0 left-0 w-full z-20 pointer-events-none hidden lg:block">
+          <svg viewBox="0 0 1440 160" className="w-full h-auto min-h-[50px] lg:min-h-[120px]" preserveAspectRatio="none">
+              <path fill={isLoggedIn && userFeed.length > 0 ? "#F8FAFC" : "#F8FAFC"} ></path>
+          </svg>
         </div>
-      </section>
-
-      {/* =========================================================================
-          SECTION 1.5: PERSONALIZED FEED (HYDRATED)
-      ========================================================================= */}
-      {isLoggedIn && userFeed.length > 0 && (
-        <section 
-            ref={feedRef} 
-            className="relative w-full py-20 bg-slate-50 border-b border-slate-200 overflow-hidden"
-        >
-            <div className="container max-w-7xl mx-auto px-6">
-                <div className={`flex flex-col md:flex-row justify-between items-end mb-12 transition-all duration-1000 ${isFeedVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-                    <div>
-                        <h2 className="text-4xl md:text-5xl font-black text-[#010038]">
-                            YOU MIGHT ALSO <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F39422] to-[#E67E22]">LIKE</span>
-                        </h2>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {userFeed.map((shoe, index) => (
-                        <div 
-                            key={shoe.id || index}
-                            onClick={() => navigate(`/shoe/${shoe.slug || shoe.shoe_id}`)}
-                            className={`group bg-white rounded-3xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_rgba(41,58,128,0.15)] border border-slate-100 hover:border-[#537EC5]/30 transition-all duration-500 cursor-pointer flex flex-col items-center relative overflow-hidden
-                                ${isFeedVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'}
-                            `}
-                            style={{ transitionDelay: `${index * 100}ms` }}
-                        >
-                            <div className="absolute top-[-50px] right-[-50px] w-32 h-32 bg-[#537EC5]/10 rounded-full blur-2xl group-hover:bg-[#F39422]/10 transition-colors duration-500"></div>
-
-                            <div className="w-full h-40 flex items-center justify-center mb-4 relative z-10">
-                                <img 
-                                    src={shoe.img_url || shoe.img || shoe.mainImage} 
-                                    alt={shoe.name} 
-                                    className="w-full h-full object-contain mix-blend-multiply transform group-hover:scale-105 transition-transform duration-300"
-                                />
-                            </div>
-
-                            <div className="w-full text-left relative z-10">
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">{shoe.brand}</p>
-                                <h3 className="text-lg font-bold text-[#010038] leading-tight line-clamp-2 group-hover:text-[#293A80] transition-colors">
-                                    {shoe.name}
-                                </h3>
-                                
-                                <div className="mt-4 flex items-center justify-between">
-                                    <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg">
-                                        <svg className="w-4 h-4 text-[#F39422]" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
-                                        </svg>
-                                        <span className="text-sm font-bold text-slate-700">{shoe.rating ? shoe.rating : 0.0}</span>
-                                    </div>
-                                    <span className="w-8 h-8 rounded-full bg-[#293A80] flex items-center justify-center text-white group-hover:bg-[#F39422] transition-colors shadow-lg">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                        </svg>
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </section>
-      )}
+    </section>
 
 
       {/* =========================================================================
