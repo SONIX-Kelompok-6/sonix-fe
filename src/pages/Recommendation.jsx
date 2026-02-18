@@ -36,11 +36,14 @@ export default function Recommendation() {
   const navigate = useNavigate();
   const { allShoes, updateShoeState, isLoading: isContextLoading } = useShoes();
 
+  // --- STATES ---
   const [step, setStep] = useState("menu"); 
   const [showMore, setShowMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [authError, setAuthError] = useState(null);
   const [error, setError] = useState(null);
+  const [notification, setNotification] = useState(null);
 
   const [searchResults, setSearchResults] = useState([]); 
   const [favoriteIds, setFavoriteIds] = useState([]); 
@@ -53,29 +56,39 @@ export default function Recommendation() {
   const [sortBy, setSortBy] = useState("recommended");
 
   const prefetchRef = useRef(null);
+  
+  // --- HELPER NOTIFIKASI ---
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
-  // 🔥 1. RESTORE STATE SAAT PAGE DIMUAT (LOGIC BARU)
+  const showNotification = (message) => {
+    setNotification(message);
+  };
+
+  // 🔥 1. RESTORE STATE SAAT PAGE MOUNT (Setiap kali halaman dibuka)
   useEffect(() => {
     try {
       const savedState = sessionStorage.getItem("rush_rec_state");
       if (savedState) {
         const parsed = JSON.parse(savedState);
-        // Restore data
         setCommonData(parsed.commonData);
         setRoadData(parsed.roadData);
         setTrailData(parsed.trailData);
         setSearchResults(parsed.results || []);
         
-        // Restore step dengan aman
-        if (parsed.step === 'results') {
-            setStep('results');
-        } else if (parsed.step === 'road' || parsed.step === 'trail') {
+        // Restore Step terakhir user
+        if (parsed.step) {
             setStep(parsed.step);
         }
       }
     } catch (e) {
       console.warn("Gagal restore state", e);
     }
+    // HAPUS CLEANUP FUNCTION DISINI. BIARKAN DATA PERSISTENT.
   }, []);
 
   // --- HELPER SAVE STATE ---
@@ -90,37 +103,43 @@ export default function Recommendation() {
     sessionStorage.setItem("rush_rec_state", JSON.stringify(stateToSave));
   };
 
-  // --- HYBRID FEED (TETAP SAMA) ---
+  // 🔥 HANDLER NAVIGASI (Sederhana saja)
+  const goToDetail = (slug) => {
+      if (!slug) return;
+      navigate(`/shoe/${slug}`);
+  };
+
+  // --- CEK LOGIN & FETCH FEED ---
   useEffect(() => {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId");
 
     if (!token) {
-      setError("Please login to use the Recommendation feature.");
+        setAuthError("Please login to use the Recommendation feature.");
     } else {
-      setError(null);
-      if (userId && allShoes.length > 0) { 
-        const fetchFeed = async () => {
-          try {
-            const feed = await getUserFeed(userId);
-            if (feed && feed.length > 0) {
-               const hydratedFeed = feed.map(item => {
-                  const targetId = typeof item === 'object' ? (item.id || item.shoe_id) : item;
-                  return allShoes.find(s => 
-                      String(s.shoe_id) === String(targetId) || 
-                      String(s.id) === String(targetId)
-                  );
-               }).filter(Boolean);
-               setRealtimeRecs(hydratedFeed); 
-            }
-          } catch (err) { console.error("Feed error:", err); }
-        };
-        fetchFeed();
-      }
+        setAuthError(null);
+        if (userId && allShoes.length > 0) { 
+            const fetchFeed = async () => {
+            try {
+                const feed = await getUserFeed(userId);
+                if (feed && feed.length > 0) {
+                const hydratedFeed = feed.map(item => {
+                    const targetId = typeof item === 'object' ? (item.id || item.shoe_id) : item;
+                    return allShoes.find(s => 
+                        String(s.shoe_id) === String(targetId) || 
+                        String(s.id) === String(targetId)
+                    );
+                }).filter(Boolean);
+                setRealtimeRecs(hydratedFeed); 
+                }
+            } catch (err) { console.error("Feed error:", err); }
+            };
+            fetchFeed();
+        }
     }
   }, [allShoes.length]);
 
-  // --- FETCH FAVORITES SAAT MOUNT (TETAP SAMA) ---
+  // --- FETCH FAVORITES ---
   useEffect(() => {
     const fetchUserFavorites = async () => {
       const token = localStorage.getItem("userToken");
@@ -187,24 +206,23 @@ export default function Recommendation() {
     return hydratedResults;
   };
 
-  // --- AUTO PREFETCH (TETAP SAMA + SAVE STATE) ---
+  // --- AUTO PREFETCH & AUTO SAVE ---
   useEffect(() => {
     const valid = isFormValid();
-    if (valid && !prefetchRef.current && !loading && !error && !isContextLoading) {
+    if (valid && !prefetchRef.current && !loading && !error && !isContextLoading && !authError) {
        prefetchRef.current = performFetch().catch(err => {
            console.warn("Silent prefetch failed", err);
            return null;
        });
     }
-    // Simpan state input biar ga ilang kalau refresh
-    if (step !== 'menu' && step !== 'results') {
-        saveStateToStorage(step, []);
+    // 🔥 Simpan state ke storage tiap kali input berubah (Persistent)
+    if (step !== 'menu') {
+        saveStateToStorage(step, searchResults); // Pass current results too
     }
-  }, [commonData, roadData, trailData, step]); 
+  }, [commonData, roadData, trailData, step, authError, searchResults]); 
 
   const handleFind = async () => {
-    const userId = localStorage.getItem("userId");
-    if (!userId) { setError("User ID not found. Please re-login."); return; }
+    if (authError) return;
     if (isContextLoading || !allShoes || allShoes.length === 0) {
         setError("Database is still loading... please wait a moment.");
         return;
@@ -223,7 +241,7 @@ export default function Recommendation() {
       setError(null);
       setStep("results");
       
-      // 🔥 2. SIMPAN HASIL KE STORAGE SAAT SUKSES
+      // 🔥 Simpan hasil ke storage
       saveStateToStorage("results", finalResults);
 
     } catch (err) {
@@ -232,10 +250,9 @@ export default function Recommendation() {
     } finally { setLoading(false); }
   };
 
-  // --- HANDLERS LAIN (TETAP SAMA) ---
   const handleUseProfile = async () => {
     const token = localStorage.getItem("userToken");
-    if (!token) { setError("Please login to use profile."); return; }
+    if (!token) return;
     setProfileLoading(true);
     prefetchRef.current = null;
     try {
@@ -252,19 +269,20 @@ export default function Recommendation() {
       if (userProfile.foot_width) mappedWidth = capitalizeFirst(userProfile.foot_width.trim());
       setCommonData({ footWidth: mappedWidth, archType: mappedArch, orthotics: userProfile.uses_orthotics ? "Yes" : "No" });
       setError(null);
+      showNotification("Profile data loaded! ✅");
     } catch (err) { setError("Failed to load profile."); } finally { setProfileLoading(false); }
   };
 
   const handleAddFavorite = async (shoeId) => {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId");
-    if (!token) { setError("Please login to save favorites."); return; }
+    if (!token) return;
+
     const idString = String(shoeId);
     const isCurrentlyFavorite = favoriteIds.includes(idString);
     const newStatus = !isCurrentlyFavorite; 
     setFavoriteIds((prevIds) => isCurrentlyFavorite ? prevIds.filter(id => id !== idString) : [...prevIds, idString]);
     
-    // Update Context Global
     if (allShoes.length > 0) {
         const updatedGlobalList = allShoes.map(shoe => {
             if (String(shoe.shoe_id) === idString || String(shoe.id) === idString) {
@@ -275,6 +293,8 @@ export default function Recommendation() {
         updateShoeState(updatedGlobalList);
     }
 
+    showNotification(newStatus ? "Added to Favorites ❤️" : "Removed from Favorites 💔");
+
     try {
       const interactionValue = newStatus ? 1 : 0;
       const favPromise = api.post("/api/favorites/toggle/", { shoe_id: idString }, { headers: { Authorization: `Token ${token}` } });
@@ -283,7 +303,7 @@ export default function Recommendation() {
     } catch (err) {
       setFavoriteIds((prevIds) => isCurrentlyFavorite ? [...prevIds, idString] : prevIds.filter(id => id !== idString));
       updateShoeState(allShoes); 
-      setError("Failed to sync with server.");
+      showNotification("Failed to update favorite ⚠️");
     }
   };
 
@@ -307,12 +327,8 @@ export default function Recommendation() {
 
   const handleBrandToggle = (brand) => { if (selectedBrands.includes(brand)) setSelectedBrands(selectedBrands.filter((b) => b !== brand)); else setSelectedBrands([...selectedBrands, brand]); };
   
-  const sourceData = searchResults.length > 0 ? searchResults : []; 
-  const featuredShoe = sourceData[0]; 
-  const availableListShoes = sourceData.slice(1);
-  
   const filteredListShoes = useMemo(() => {
-    let result = [...availableListShoes]; 
+    let result = [...(searchResults.length > 0 ? searchResults.slice(1) : [])]; 
     if (selectedBrands.length > 0) {
         result = result.filter(shoe => {
             if (!shoe.brand) return false;
@@ -323,7 +339,9 @@ export default function Recommendation() {
     if (sortBy === "lowHigh") result.sort((a, b) => (Number(a.weight_lab_oz) || 999) - (Number(b.weight_lab_oz) || 999));
     else if (sortBy === "highLow") result.sort((a, b) => (Number(b.weight_lab_oz) || 0) - (Number(a.weight_lab_oz) || 0));
     return result;
-  }, [selectedBrands, sortBy, availableListShoes]);
+  }, [searchResults, selectedBrands, sortBy]);
+
+  const featuredShoe = searchResults.length > 0 ? searchResults[0] : null;
 
   const widthOptions = [{ label: 'Narrow', value: 'Narrow', img: imgNarrow }, { label: 'Regular', value: 'Regular', img: imgRegular }, { label: 'Wide', value: 'Wide', img: imgWide }];
   const archOptions = [{ label: 'Flat Arch', value: 'Flat', img: imgFlat }, { label: 'Normal Arch', value: 'Normal', img: imgNormal }, { label: 'High Arch', value: 'High', img: imgHigh }];
@@ -353,21 +371,32 @@ export default function Recommendation() {
       <div className="min-h-screen flex flex-col items-center justify-center pt-30" style={gridStyle}>
         <Navbar />
         <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl w-[90%] max-w-4xl p-8 border border-gray-100 flex flex-col items-center transition-all duration-500">
-          {error && (
+          
+          {authError && (
+            <div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2">
+                <span>{authError}</span>
+                <Link to="/login" className="px-4 py-1.5 bg-red-600 text-white text-[10px] font-bold rounded-full hover:bg-red-700 transition-colors">Go to Login</Link>
+            </div>
+          )}
+
+          {error && !authError && (
             <div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2"><span>{error}</span></div>
           )}
+          
           {isContextLoading && (
               <div className="mb-4 px-4 py-2 bg-blue-50 text-blue-800 rounded-full text-xs font-bold animate-pulse">Preparing database...</div>
           )}
+          
           <h2 className="text-center font-bold tracking-[0.1em] mb-8 text-gray-800 text-xl uppercase">Types of Running</h2>
-          <div className="flex flex-col md:flex-row gap-6 w-full px-2">
+          
+          <div className={`flex flex-col md:flex-row gap-6 w-full px-2 transition-all duration-300 ${authError ? 'opacity-50 grayscale pointer-events-none select-none' : ''}`}>
             <div 
                 onClick={() => { 
-                    if(!error && !isContextLoading) { 
+                    if(!authError && !error && !isContextLoading) { 
+                        // 🔥 RESET STORAGE SAAT MULAI BARU
+                        sessionStorage.removeItem("rush_rec_state");
                         setStep("road"); 
                         setShowMore(false); 
-                        // 🔥 3. RESET STORAGE KALAU MULAI DARI AWAL
-                        sessionStorage.removeItem("rush_rec_state");
                     } 
                 }} 
                 className={`relative flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-64 ${(error || isContextLoading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`}>
@@ -377,11 +406,11 @@ export default function Recommendation() {
             </div>
             <div 
                 onClick={() => { 
-                    if(!error && !isContextLoading) { 
+                    if(!authError && !error && !isContextLoading) { 
+                        // 🔥 RESET STORAGE SAAT MULAI BARU
+                        sessionStorage.removeItem("rush_rec_state");
                         setStep("trail"); 
                         setShowMore(false); 
-                        // 🔥 3. RESET STORAGE KALAU MULAI DARI AWAL
-                        sessionStorage.removeItem("rush_rec_state");
                     } 
                 }} 
                 className={`relative flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-64 ${(error || isContextLoading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`}>
@@ -404,13 +433,16 @@ export default function Recommendation() {
            <div className="max-w-6xl mx-auto">
                <div className="flex flex-col gap-4 mb-6">
                  <div className="flex items-center gap-4">
-                   {/* BUTTON BACK DISINI TETAP BALIK KE FORM (NORMAL) */}
                    <button onClick={() => setStep(roadData.purpose ? "road" : "trail")} className="text-sm font-bold text-gray-400 hover:text-blue-600 bg-white/50 px-3 py-1 rounded-full">← BACK</button>
                    <h1 className="text-2xl font-serif font-bold text-gray-800">Recommended for you :</h1>
                  </div>
                </div>
+               
                {featuredShoe ? (
-                   <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-sm p-8 mb-10 flex flex-col md:flex-row items-center gap-8 border border-gray-100 relative overflow-hidden">
+                   <div 
+                      onClick={() => goToDetail(featuredShoe.slug || featuredShoe.id)}
+                      className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-sm p-8 mb-10 flex flex-col md:flex-row items-center gap-8 border border-gray-100 relative overflow-hidden cursor-pointer group"
+                   >
                        <div className="absolute top-0 left-0 bg-yellow-400 text-yellow-900 text-xs font-bold px-4 py-1 rounded-br-xl shadow-sm z-20">TOP MATCH</div>
                        <div className="w-full md:w-1/2 flex justify-center bg-blue-50 rounded-xl p-6 relative">
                            <img src={featuredShoe.img || featuredShoe.img_url} alt={featuredShoe.name} className="w-[80%] object-contain drop-shadow-xl z-10 hover:scale-110 transition-transform duration-500" />
@@ -419,9 +451,9 @@ export default function Recommendation() {
                            <div className="flex justify-between items-start">
                                <div>
                                    <p className="text-gray-500 text-sm font-bold uppercase tracking-wider mb-1">{featuredShoe.brand}</p>
-                                   <h2 className="text-4xl font-serif font-bold text-gray-900 leading-tight">{featuredShoe.name}</h2>
+                                   <h2 className="text-4xl font-serif font-bold text-gray-900 leading-tight group-hover:text-blue-900 transition-colors">{featuredShoe.name}</h2>
                                </div>
-                               <button onClick={(e) => { e.stopPropagation(); handleAddFavorite(String(featuredShoe.shoe_id || featuredShoe.id)); }} className="transition-transform active:scale-90 cursor-pointer">
+                               <button onClick={(e) => { e.stopPropagation(); handleAddFavorite(String(featuredShoe.shoe_id || featuredShoe.id)); }} className="transition-transform active:scale-90 cursor-pointer p-2 rounded-full hover:bg-gray-100">
                                    {favoriteIds.includes(String(featuredShoe.shoe_id || featuredShoe.id)) ? (
                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10 text-red-500"><path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" /></svg>
                                    ) : (
@@ -434,7 +466,7 @@ export default function Recommendation() {
                                <svg className="w-6 h-6 text-gray-800 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                                <span className="text-xl font-bold text-gray-800">{featuredShoe.rating ? featuredShoe.rating.toFixed(1) : "0.0"}</span>
                            </div>
-                           <button onClick={() => navigate(`/shoe/${featuredShoe.slug || featuredShoe.id}`)} className="bg-[#000080] text-white px-8 py-3 rounded-lg font-bold text-lg hover:bg-blue-900 transition-colors shadow-lg cursor-pointer">Learn More</button>
+                           <button onClick={(e) => {e.stopPropagation(); goToDetail(featuredShoe.slug || featuredShoe.id)}} className="bg-[#000080] text-white px-8 py-3 rounded-lg font-bold text-lg hover:bg-blue-900 transition-colors shadow-lg cursor-pointer">Learn More</button>
                        </div>
                    </div>
                ) : (<div className="text-center py-20 text-gray-500 bg-white/80 rounded-2xl mb-10 shadow-sm border border-gray-100"><p className="text-lg">No recommendations found yet.</p><p className="text-sm">Try adjusting your filters or search again.</p></div>)}
@@ -485,13 +517,17 @@ export default function Recommendation() {
                        </div>
                        {filteredListShoes.length > 0 ? (
                            filteredListShoes.map((shoe) => (
-                               <div key={shoe.id || shoe.shoe_id} className="bg-white/90 backdrop-blur-sm rounded-xl p-4 flex flex-col sm:flex-row items-center gap-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group">
+                               <div 
+                                  key={shoe.id || shoe.shoe_id} 
+                                  onClick={() => goToDetail(shoe.slug || shoe.shoe_id || shoe.id)}
+                                  className="bg-white/90 backdrop-blur-sm rounded-xl p-4 flex flex-col sm:flex-row items-center gap-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group cursor-pointer"
+                               >
                                    <div className="w-full sm:w-[180px] h-[120px] bg-blue-50 rounded-lg flex items-center justify-center p-2">
                                        <img src={shoe.img || shoe.img_url} alt={shoe.name} className="max-w-full max-h-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform" />
                                    </div>
                                    <div className="flex-1 w-full">
                                        <p className="text-xs font-bold text-gray-500 uppercase mb-1">{shoe.brand}</p>
-                                       <h4 className="font-serif font-bold text-xl text-gray-900 mb-1">{shoe.name}</h4>
+                                       <h4 className="font-serif font-bold text-xl text-gray-900 mb-1 group-hover:text-blue-900 transition-colors">{shoe.name}</h4>
                                        <p className="text-gray-600 text-sm mb-3">Weight : {shoe.weight_lab_oz}oz</p>
                                        <div className="flex items-center gap-1">
                                            <svg className="w-4 h-4 text-gray-800 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
@@ -499,14 +535,14 @@ export default function Recommendation() {
                                        </div>
                                    </div>
                                    <div className="flex flex-row sm:flex-col items-center justify-between w-full sm:w-auto gap-3 mt-2 sm:mt-0">
-                                       <button onClick={(e) => { e.stopPropagation(); handleAddFavorite(String(shoe.shoe_id || shoe.id)); }} className="transition-transform active:scale-90 text-gray-400 hover:text-red-500 cursor-pointer">
+                                       <button onClick={(e) => { e.stopPropagation(); handleAddFavorite(String(shoe.shoe_id || shoe.id)); }} className="transition-transform active:scale-90 text-gray-400 hover:text-red-500 cursor-pointer p-2 rounded-full hover:bg-gray-100">
                                            {favoriteIds.includes(String(shoe.shoe_id || shoe.id)) ? (
                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 text-red-500"><path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" /></svg>
                                            ) : (
                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" /></svg>
                                            )}
                                        </button>
-                                       <button onClick={() => navigate(`/shoe/${shoe.slug || shoe.shoe_id || shoe.id}`)} className="bg-[#000080] text-white text-xs font-bold px-5 py-2.5 rounded-lg hover:bg-blue-900 transition-colors whitespace-nowrap cursor-pointer">Learn More</button>
+                                       <button onClick={() => { e.stopPropagation(); goToDetail(shoe.slug || shoe.shoe_id || shoe.id); }} className="bg-[#000080] text-white text-xs font-bold px-5 py-2.5 rounded-lg hover:bg-blue-900 transition-colors whitespace-nowrap cursor-pointer">Learn More</button>
                                    </div>
                                </div>
                            ))
@@ -515,6 +551,10 @@ export default function Recommendation() {
                </div>
            </div>
            <Footer />
+
+           <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-3 transition-all duration-300 ${notification ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
+             <span className="text-sm font-bold">{notification}</span>
+           </div>
         </div>
       );
   }
@@ -524,11 +564,10 @@ export default function Recommendation() {
     <div className="min-h-screen flex flex-col items-center justify-center p-4 pt-30 font-sans animate-in fade-in duration-500" style={gridStyle}>
       <Navbar />
       <div className="bg-white/90 backdrop-blur-md rounded-xl shadow-2xl w-full max-w-md p-6 relative border border-gray-100">
-        {/* 🔥 RESET STORAGE SAAT BACK DARI FORM */}
         <button 
             onClick={() => {
                 setStep("menu");
-                sessionStorage.removeItem("rush_rec_state");
+                sessionStorage.removeItem("rush_rec_state"); // Reset manual kalau back dari form
             }} 
             className="absolute top-4 left-4 text-[10px] font-bold text-gray-400 hover:text-orange-500 bg-gray-50 px-2 py-1 rounded-full cursor-pointer"
         >
@@ -538,10 +577,11 @@ export default function Recommendation() {
         <h1 className="text-center font-bold text-2xl text-gray-800 mb-4 mt-2 uppercase tracking-widest">
           {step === "road" ? "User Input Road" : "User Input Trail"}
         </h1>
+        
         {error && (<div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2"><span>{error}</span><Link to="/login" className="px-4 py-1.5 bg-red-600 text-white text-[10px] font-bold rounded-full hover:bg-red-700 transition-colors">Go to Login</Link></div>)}
+        
         <div className="text-right mb-4"><button onClick={handleUseProfile} disabled={profileLoading} className="text-[12px] italic text-gray-500 hover:text-blue-600 underline disabled:opacity-50 cursor-pointer">{profileLoading ? "Loading Profile..." : "Use My Profile"}</button></div>
         
-        {/* ... FORM INPUTS (TETAP SAMA) ... */}
         <div className="mb-6 text-left"><label className="block text-sm font-bold mb-3 uppercase text-gray-800">Foot Width Type <span className="text-red-500">*</span></label><div className="grid grid-cols-3 gap-3">{widthOptions.map((opt) => (<button key={opt.label} onClick={() => handleToggleSelect('footWidth', opt.value)} className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center transition-all ${commonData.footWidth === opt.value ? activeStyle : inactiveStyle}`}><img src={opt.img} alt={opt.label} className="h-10 w-auto mb-2" /><span className="text-[12px] font-bold">{opt.label}</span></button>))}</div></div>
         
         <div className="mb-6 text-left"><label className="block text-sm font-bold mb-3 uppercase text-gray-800">Arch Type <span className="text-red-500">*</span></label><div className="grid grid-cols-3 gap-3">{archOptions.map((opt) => (<button key={opt.label} onClick={() => handleToggleSelect('archType', opt.value)} className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center transition-all ${commonData.archType === opt.value ? activeStyle : inactiveStyle}`}><img src={opt.img} alt={opt.label} className="h-8 w-auto mb-2" /><span className="text-[12px] font-bold leading-tight">{opt.label}</span></button>))}</div></div>
@@ -582,6 +622,11 @@ export default function Recommendation() {
         {loading ? 'Finding...' : isContextLoading ? 'Loading Database...' : 'Find'}
       </button>
       <Footer />
+
+      {/* 🔥 TOAST NOTIFICATION COMPONENT 🔥 */}
+      <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-3 transition-all duration-300 ${notification ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
+        <span className="text-sm font-bold">{notification}</span>
+      </div>
     </div>
   );
 }
