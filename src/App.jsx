@@ -28,7 +28,7 @@ export default function App() {
     "/register", 
     "/create-profile", 
     "/forgot-password", 
-    "/update-password"
+    "/update-password",
   ];
 
   // Cek apakah lokasi saat ini ada di dalam daftar di atas
@@ -59,6 +59,7 @@ export default function App() {
           <Route path="/shoe/:slug" element={<ShoeDetail />} />
           <Route path="/compare" element={<Compare />} />
           <Route path="/account" element={<Account />} />
+
           <Route path="*" element={<div className="text-center font-bold mt-10">404 - Page Not Found</div>} />
         </Routes>
       </main>
