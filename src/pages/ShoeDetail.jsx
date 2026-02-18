@@ -268,8 +268,8 @@ export default function ShoeDetail() {
             </div>
 
             <div className="md:w-1/2 p-8 flex flex-col justify-center bg-[#e9eef5]">
-              <h3 className="text-xl font-semibold text-gray-700">{shoeData.brand}</h3>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">{shoeData.name || shoeData.model}</h1>
+              <h3 className="text-xl font-semibold text-gray-700">{shoeData.brand.toUpperCase()}</h3>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">{shoeData.name}</h1>
               <p className="text-lg text-gray-600 mb-4">Weight : {shoeData.weight_lab_oz || "-"} oz</p>
               <p className="text-gray-700 mb-6 leading-relaxed">{shoeData.description}</p>
 
