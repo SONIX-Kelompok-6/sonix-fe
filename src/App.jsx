@@ -31,8 +31,14 @@ export default function App() {
     "/update-password",
   ];
 
+  const hideFooterRoutes = [
+    "/recommendation",
+    "/shoes-detail",
+  ];
+
   // Cek apakah lokasi saat ini ada di dalam daftar di atas
   const shouldHideNavbarFooter = hideNavbarFooterRoutes.includes(location.pathname);
+  const shouldHideFooter = hideFooterRoutes.includes(location.pathname);
 
   // Logic lama untuk padding (tetap dipertahankan, tapi disesuaikan sedikit)
   const isCustomLayoutPage = location.pathname === "/";
@@ -65,7 +71,7 @@ export default function App() {
       </main>
 
       {/* 3. PERUBAHAN: Render Footer HANYA jika shouldHideNavbarFooter bernilai false */}
-      {!shouldHideNavbarFooter && <Footer />}
+      {(!shouldHideNavbarFooter && !shouldHideFooter) && <Footer />}
       
     </div>
   );

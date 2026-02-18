@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react"; // Tambah useRef
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import api from "../api/axios"; 
 import { useNavigate, Link } from "react-router-dom";
 import { getRecommendations, sendInteraction, getUserFeed } from "../services/SonixMl";
@@ -13,6 +13,7 @@ import imgWide from '../assets/profile-images/foot-wide.svg';
 import imgFlat from '../assets/profile-images/arch-flat.svg';
 import imgNormal from '../assets/profile-images/arch-normal.svg';
 import imgHigh from '../assets/profile-images/arch-high.svg';
+import Footer from "../components/Footer";
 
 const BRANDS_LIST = ["ASICS", "Nike", "New Balance", "Adidas", "Saucony", "HOKA", "Brooks", "On", "PUMA", "Altra", "Mizuno", "Salomon", "Under Armour", "Skechers", "Reebok", "Merrell", "Topo Athletic"];
 
@@ -21,10 +22,18 @@ const capitalizeFirst = (str) => {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 };
 
+// Style Objek untuk Grid Halus
+const gridStyle = {
+  backgroundColor: "#f9fafb",
+  backgroundImage: `
+    linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px)
+  `,
+  backgroundSize: "40px 40px"
+};
+
 export default function Recommendation() {
   const navigate = useNavigate();
-
-  // --- AMBIL DATA DARI CONTEXT (GUDANG DATA) ---
   const { allShoes, isLoading: isContextLoading } = useShoes();
 
   const [step, setStep] = useState("menu"); 
@@ -33,24 +42,18 @@ export default function Recommendation() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // --- STATE DATA ---
   const [searchResults, setSearchResults] = useState([]); 
   const [favoriteIds, setFavoriteIds] = useState([]); 
   const [realtimeRecs, setRealtimeRecs] = useState([]);
 
-  // STATES INPUT
   const [commonData, setCommonData] = useState({ footWidth: null, archType: null, orthotics: null });
   const [roadData, setRoadData] = useState({ purpose: null, pace: null, cushion: null, season: null, stability: null, strike: null });
   const [trailData, setTrailData] = useState({ terrain: null, pace: null, season: null, strike: null, waterResistant: null, rockSensitivity: null });
   const [selectedBrands, setSelectedBrands] = useState([]);
   const [sortBy, setSortBy] = useState("recommended");
 
-  // 🔥 1. REF UNTUK SIMPAN REQUEST BACKGROUND
   const prefetchRef = useRef(null);
 
-  // ==============================================
-  // HYBRID FEED TRIGGER
-  // ==============================================
   useEffect(() => {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId");
@@ -95,8 +98,6 @@ export default function Recommendation() {
     fetchUserFavorites();
   }, []);
 
-  // --- HELPER: CEK FORM VALID ---
-  // (Dipindah ke atas biar bisa dipakai useEffect)
   const isFormValid = () => {
     const baseValid = commonData.footWidth && commonData.archType && commonData.orthotics;
     if (step === "road") return baseValid && roadData.purpose;
@@ -104,7 +105,6 @@ export default function Recommendation() {
     return false;
   };
 
-  // --- 2. LOGIC FETCH TERPISAH (Bisa dipanggil manual atau auto) ---
   const performFetch = async () => {
     const type = step === "road" ? "road" : "trail";
     const cleanArch = commonData.archType; 
@@ -133,13 +133,10 @@ export default function Recommendation() {
       water_resistance: cleanWater
     };
 
-    // Request ke ML (Dapat ID)
     const response = await getRecommendations(type, payload);
-    
     let mlList = Array.isArray(response) ? response : (response.data || []);
     if (mlList.length === 0) return [];
 
-    // Hydration (ID -> Object dari Context)
     const hydratedResults = mlList.map(targetId => {
         const cleanId = String(targetId).trim();
         return allShoes.find(s => 
@@ -152,95 +149,59 @@ export default function Recommendation() {
     return hydratedResults;
   };
 
-  // --- 🔥 3. AUTO-PREFETCH (CURI START) 🔥 ---
-  // Jalan otomatis setiap kali user mengubah input
   useEffect(() => {
     const valid = isFormValid();
-    
-    // Syarat: Form Lengkap + Belum ada request jalan + Tidak sedang loading
     if (valid && !prefetchRef.current && !loading && !error && !isContextLoading) {
-       console.log("⚡ Form Complete! Auto-prefetching data...");
-       
-       // Simpan PROMISE request ke ref (bukan hasilnya, tapi prosesnya)
        prefetchRef.current = performFetch().catch(err => {
            console.warn("Silent prefetch failed", err);
            return null;
        });
     }
-  }, [commonData, roadData, trailData, step]); // Dependency ke semua input
+  }, [commonData, roadData, trailData, step]); 
 
-
-  // --- 4. HANDLE FIND (EKSEKUSI) ---
   const handleFind = async () => {
     const userId = localStorage.getItem("userId");
     if (!userId) { setError("User ID not found. Please re-login."); return; }
-    
     if (isContextLoading || !allShoes || allShoes.length === 0) {
         setError("Database is still loading... please wait a moment.");
         return;
     }
-
     setLoading(true);
-
     try {
       let results;
-
-      // Cek: Apakah sudah ada titipan data dari Auto-Prefetch?
       if (prefetchRef.current) {
-          console.log("🚀 Using Prefetched Data (Instant Load!)");
-          results = await prefetchRef.current; // Tunggu janji yang dibuat useEffect tadi
-          prefetchRef.current = null; // Reset
+          results = await prefetchRef.current; 
+          prefetchRef.current = null; 
       } else {
-          console.log("🐌 Fetching manually...");
-          results = await performFetch(); // Fetch manual kalau prefetch belum sempat jalan
+          results = await performFetch(); 
       }
-
-      if (!results || results.length === 0) {
-        setSearchResults([]);
-      } else {
-        setSearchResults(results);
-      }
-
+      setSearchResults(results || []);
       setError(null);
       setStep("results");
-
     } catch (err) {
-      console.error("❌ AI Error:", err);
       setError("AI Engine is busy. Please try again.");
       prefetchRef.current = null;
-    } finally { 
-      setLoading(false); 
-    }
+    } finally { setLoading(false); }
   };
 
   const handleUseProfile = async () => {
     const token = localStorage.getItem("userToken");
     if (!token) { setError("Please login to use profile."); return; }
     setProfileLoading(true);
-    prefetchRef.current = null; // Reset prefetch karena data berubah
-
+    prefetchRef.current = null;
     try {
       const response = await api.get("/api/profile/", { headers: { Authorization: `Token ${token}` } });
       const userProfile = response.data.profile || response.data;
-
       let mappedArch = null;
       if (userProfile.arch_type) {
-         const archLower = userProfile.arch_type.toLowerCase();
-         if (archLower.includes("flat")) mappedArch = "Flat";
-         else if (archLower.includes("high")) mappedArch = "High";
-         else mappedArch = "Normal";
+          const archLower = userProfile.arch_type.toLowerCase();
+          if (archLower.includes("flat")) mappedArch = "Flat";
+          else if (archLower.includes("high")) mappedArch = "High";
+          else mappedArch = "Normal";
       }
-
       let mappedWidth = null;
-      if (userProfile.foot_width) {
-          mappedWidth = capitalizeFirst(userProfile.foot_width.trim());
-      }
-
-      setCommonData({ 
-          footWidth: mappedWidth, 
-          archType: mappedArch, 
-          orthotics: userProfile.uses_orthotics ? "Yes" : "No" 
-      });
+      if (userProfile.foot_width) mappedWidth = capitalizeFirst(userProfile.foot_width.trim());
+      setCommonData({ footWidth: mappedWidth, archType: mappedArch, orthotics: userProfile.uses_orthotics ? "Yes" : "No" });
       setError(null);
     } catch (err) { setError("Failed to load profile."); } finally { setProfileLoading(false); }
   };
@@ -249,40 +210,22 @@ export default function Recommendation() {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId");
     if (!token) { setError("Please login to save favorites."); return; }
-
     const idString = String(shoeId);
     const isCurrentlyFavorite = favoriteIds.includes(idString);
     const interactionValue = isCurrentlyFavorite ? 0 : 1; 
-
-    setFavoriteIds((prevIds) => 
-        isCurrentlyFavorite 
-        ? prevIds.filter(id => id !== idString) 
-        : [...prevIds, idString]
-    );
-
+    setFavoriteIds((prevIds) => isCurrentlyFavorite ? prevIds.filter(id => id !== idString) : [...prevIds, idString]);
     try {
-      // Parallel Request: Gak perlu nunggu favorite kelar baru kirim interaksi
       const favPromise = api.post("/api/favorites/toggle/", { shoe_id: idString }, { headers: { Authorization: `Token ${token}` } });
-      
-      if (userId) {
-        sendInteraction(userId, idString, 'like', interactionValue).catch(console.warn);
-      }
-      
-      await favPromise; // Cuma perlu await favorite buat error handling
+      if (userId) sendInteraction(userId, idString, 'like', interactionValue).catch(console.warn);
+      await favPromise; 
     } catch (err) {
-      console.error("Failed to toggle favorite:", err);
-      setFavoriteIds((prevIds) => 
-          isCurrentlyFavorite ? [...prevIds, idString] : prevIds.filter(id => id !== idString)
-      );
+      setFavoriteIds((prevIds) => isCurrentlyFavorite ? [...prevIds, idString] : prevIds.filter(id => id !== idString));
       setError("Failed to sync with server.");
     }
   };
 
-  // --- LOGIC UI & TOGGLE ---
   const handleToggleSelect = (category, value) => {
-    // Reset prefetch kalau user ganti jawaban
     prefetchRef.current = null;
-
     const commonKeys = ['footWidth', 'archType', 'orthotics'];
     if (commonKeys.includes(category)) {
       setCommonData(prev => ({...prev, [category]: prev[category] === value ? null : value}));
@@ -319,21 +262,20 @@ export default function Recommendation() {
     return result;
   }, [selectedBrands, sortBy, availableListShoes]);
 
-  // Options UI
   const widthOptions = [{ label: 'Narrow', value: 'Narrow', img: imgNarrow }, { label: 'Regular', value: 'Regular', img: imgRegular }, { label: 'Wide', value: 'Wide', img: imgWide }];
   const archOptions = [{ label: 'Flat Arch', value: 'Flat', img: imgFlat }, { label: 'Normal Arch', value: 'Normal', img: imgNormal }, { label: 'High Arch', value: 'High', img: imgHigh }];
-  const activeStyle = "border-blue-600 bg-blue-50 scale-105 shadow-md";
-  const inactiveStyle = "border-gray-200 hover:border-blue-300";
+  const activeStyle = "border-blue-600 bg-blue-50 scale-105 shadow-md font-bold text-blue-900";
+  const inactiveStyle = "border-gray-200 hover:border-blue-300 text-gray-700 font-bold bg-white";
   
   const SelectionGroup = ({ label, options, category, required = false }) => (
     <div className="mb-6 text-left">
-      <label className="block text-xs font-bold mb-3 uppercase text-gray-700">{label} {required && <span className="text-red-500">*</span>}</label>
+      <label className="block text-sm font-bold mb-3 uppercase text-gray-800">{label} {required && <span className="text-red-500">*</span>}</label>
       <div className="flex gap-3">
         {options.map((opt) => {
           const valToCheck = opt.value || opt.label || opt; 
           const isSelected = getCurrentValue(category) === valToCheck;
           return (
-            <button key={opt.label || opt} onClick={() => handleToggleSelect(category, valToCheck)} className={`flex-1 py-3 px-2 text-[11px] rounded-xl border-2 transition-all duration-200 font-bold ${isSelected ? 'border-blue-600 bg-blue-50 text-blue-900 shadow-md scale-105' : 'border-gray-200 text-gray-600 bg-white hover:border-blue-300'}`}>
+            <button key={opt.label || opt} onClick={() => handleToggleSelect(category, valToCheck)} className={`flex-1 py-3 px-2 text-[12px] rounded-xl border-2 transition-all duration-200 ${isSelected ? activeStyle : inactiveStyle}`}>
                 {opt.label || opt}
             </button>
           )
@@ -345,26 +287,29 @@ export default function Recommendation() {
   // --- RENDER MENU ---
   if (step === "menu") {
     return (
-      <div className="bg-white rounded-3xl shadow-xl w-[90%] max-w-4xl p-8 mx-auto my-10 border border-gray-100 flex flex-col items-center transition-all duration-500">
-        {error && (
-          <div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2"><span>{error}</span></div>
-        )}
-        {isContextLoading && (
-            <div className="mb-4 px-4 py-2 bg-blue-50 text-blue-800 rounded-full text-xs font-bold animate-pulse">Preparing database...</div>
-        )}
-        <h2 className="text-center font-bold tracking-[0.1em] mb-8 text-gray-800 text-xl uppercase">Types of Running</h2>
-        <div className="flex flex-col md:flex-row gap-6 w-full px-2">
-          <div onClick={() => { if(!error && !isContextLoading) { setStep("road"); setShowMore(false); } }} className={`relative flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-64 ${(error || isContextLoading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`}>
-            <img src={roadImg} alt="Road" className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out ${(!error && !isContextLoading) && 'group-hover:scale-110'}`} />
-            <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors duration-300"></div>
-            <div className="absolute inset-0 flex items-center justify-center z-10"><span className="text-white text-4xl md:text-5xl font-bold tracking-[0.25em] uppercase drop-shadow-lg text-center px-4">ROAD</span></div>
-          </div>
-          <div onClick={() => { if(!error && !isContextLoading) { setStep("trail"); setShowMore(false); } }} className={`relative flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-64 ${(error || isContextLoading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`}>
-            <img src={trailImg} alt="Trail" className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out ${(!error && !isContextLoading) && 'group-hover:scale-110'}`} />
-            <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors duration-300"></div>
-            <div className="absolute inset-0 flex items-center justify-center z-10"><span className="text-white text-4xl md:text-5xl font-bold tracking-[0.25em] uppercase drop-shadow-lg text-center px-4">TRAIL</span></div>
+      <div className="min-h-screen flex flex-col items-center justify-center pt-12" style={gridStyle}>
+        <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl w-[90%] max-w-4xl p-8 border border-gray-100 flex flex-col items-center transition-all duration-500">
+          {error && (
+            <div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2"><span>{error}</span></div>
+          )}
+          {isContextLoading && (
+              <div className="mb-4 px-4 py-2 bg-blue-50 text-blue-800 rounded-full text-xs font-bold animate-pulse">Preparing database...</div>
+          )}
+          <h2 className="text-center font-bold tracking-[0.1em] mb-8 text-gray-800 text-xl uppercase">Types of Running</h2>
+          <div className="flex flex-col md:flex-row gap-6 w-full px-2">
+            <div onClick={() => { if(!error && !isContextLoading) { setStep("road"); setShowMore(false); } }} className={`relative flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-64 ${(error || isContextLoading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`}>
+              <img src={roadImg} alt="Road" className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out ${(!error && !isContextLoading) && 'group-hover:scale-110'}`} />
+              <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors duration-300"></div>
+              <div className="absolute inset-0 flex items-center justify-center z-10"><span className="text-white text-4xl md:text-5xl font-bold tracking-[0.25em] uppercase drop-shadow-lg text-center px-4">ROAD</span></div>
+            </div>
+            <div onClick={() => { if(!error && !isContextLoading) { setStep("trail"); setShowMore(false); } }} className={`relative flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-64 ${(error || isContextLoading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`}>
+              <img src={trailImg} alt="Trail" className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out ${(!error && !isContextLoading) && 'group-hover:scale-110'}`} />
+              <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors duration-300"></div>
+              <div className="absolute inset-0 flex items-center justify-center z-10"><span className="text-white text-4xl md:text-5xl font-bold tracking-[0.25em] uppercase drop-shadow-lg text-center px-4">TRAIL</span></div>
+            </div>
           </div>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -372,16 +317,16 @@ export default function Recommendation() {
   // --- RENDER RESULT PAGE ---
   if (step === "results") {
       return (
-        <div className="min-h-screen bg-gray-50 p-6 font-sans">
+        <div className="min-h-screen p-6 font-sans" style={gridStyle}>
            <div className="max-w-6xl mx-auto">
                <div className="flex flex-col gap-4 mb-6">
                  <div className="flex items-center gap-4">
-                   <button onClick={() => setStep(roadData.purpose ? "road" : "trail")} className="text-sm font-bold text-gray-400 hover:text-blue-600">← BACK</button>
+                   <button onClick={() => setStep(roadData.purpose ? "road" : "trail")} className="text-sm font-bold text-gray-400 hover:text-blue-600 bg-white/50 px-3 py-1 rounded-full">← BACK</button>
                    <h1 className="text-2xl font-serif font-bold text-gray-800">Recommended for you :</h1>
                  </div>
                </div>
                {featuredShoe ? (
-                   <div className="bg-white rounded-2xl shadow-sm p-8 mb-10 flex flex-col md:flex-row items-center gap-8 border border-gray-100 relative overflow-hidden">
+                   <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-sm p-8 mb-10 flex flex-col md:flex-row items-center gap-8 border border-gray-100 relative overflow-hidden">
                        <div className="absolute top-0 left-0 bg-yellow-400 text-yellow-900 text-xs font-bold px-4 py-1 rounded-br-xl shadow-sm z-20">TOP MATCH</div>
                        <div className="w-full md:w-1/2 flex justify-center bg-blue-50 rounded-xl p-6 relative">
                            <img src={featuredShoe.img || featuredShoe.img_url} alt={featuredShoe.name} className="w-[80%] object-contain drop-shadow-xl z-10 hover:scale-110 transition-transform duration-500" />
@@ -408,26 +353,11 @@ export default function Recommendation() {
                            <button onClick={() => navigate(`/shoe/${featuredShoe.slug || featuredShoe.id}`)} className="bg-[#000080] text-white px-8 py-3 rounded-lg font-bold text-lg hover:bg-blue-900 transition-colors shadow-lg">Learn More</button>
                        </div>
                    </div>
-               ) : (<div className="text-center py-20 text-gray-500 bg-white rounded-2xl mb-10 shadow-sm border border-gray-100"><p className="text-lg">No recommendations found yet.</p><p className="text-sm">Try adjusting your filters or search again.</p></div>)}
-
-               {realtimeRecs.length > 0 && (
-                 <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <h3 className="text-xl font-bold text-blue-900 mb-4 italic flex items-center gap-2"><span>✨</span> Based on your last like (Real-time AI):</h3>
-                    <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
-                       {realtimeRecs.map(shoe => (
-                         <div key={shoe.id || shoe.shoe_id} className="min-w-[180px] bg-white p-4 rounded-xl shadow-sm border border-blue-100 flex flex-col items-center text-center">
-                           <div className="h-24 w-full flex items-center justify-center mb-3"><img src={shoe.img_url || shoe.img} className="max-h-full object-contain" alt={shoe.name} /></div>
-                           <p className="text-[10px] font-bold text-gray-400 uppercase">{shoe.brand}</p>
-                           <h4 className="text-xs font-bold text-gray-800 line-clamp-2">{shoe.name}</h4>
-                         </div>
-                       ))}
-                    </div>
-                 </div>
-               )}
+               ) : (<div className="text-center py-20 text-gray-500 bg-white/80 rounded-2xl mb-10 shadow-sm border border-gray-100"><p className="text-lg">No recommendations found yet.</p><p className="text-sm">Try adjusting your filters or search again.</p></div>)}
 
                <div className="flex flex-col md:flex-row gap-8">
                    <div className="w-full md:w-1/4">
-                       <div className="bg-gray-100/50 rounded-2xl p-6 sticky top-4 max-h-[85vh] flex flex-col">
+                       <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 sticky top-4 max-h-[85vh] flex flex-col shadow-sm border border-gray-100">
                            <div className="shrink-0">
                                <h3 className="text-lg font-bold text-gray-800 mb-4">Brand :</h3>
                                {selectedBrands.length > 0 && (
@@ -462,7 +392,7 @@ export default function Recommendation() {
                            <h3 className="font-serif font-bold text-xl text-gray-800">Best Shoes For You :</h3>
                            <div className="flex items-center gap-2">
                                <span className="text-sm text-gray-600">Sort by:</span>
-                               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-gray-100 border-none text-sm font-bold text-gray-800 rounded-lg py-2 pl-3 pr-8 cursor-pointer focus:ring-0">
+                               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-white border-none text-sm font-bold text-gray-800 rounded-lg py-2 pl-3 pr-8 cursor-pointer focus:ring-0 shadow-sm">
                                    <option value="recommended">Recommended</option>
                                    <option value="lowHigh">Weight: low to high</option>
                                    <option value="highLow">Weight: high to low</option>
@@ -471,7 +401,7 @@ export default function Recommendation() {
                        </div>
                        {filteredListShoes.length > 0 ? (
                            filteredListShoes.map((shoe) => (
-                               <div key={shoe.id || shoe.shoe_id} className="bg-white rounded-xl p-4 flex flex-col sm:flex-row items-center gap-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group">
+                               <div key={shoe.id || shoe.shoe_id} className="bg-white/90 backdrop-blur-sm rounded-xl p-4 flex flex-col sm:flex-row items-center gap-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group">
                                    <div className="w-full sm:w-[180px] h-[120px] bg-blue-50 rounded-lg flex items-center justify-center p-2">
                                        <img src={shoe.img || shoe.img_url} alt={shoe.name} className="max-w-full max-h-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform" />
                                    </div>
@@ -496,45 +426,56 @@ export default function Recommendation() {
                                    </div>
                                </div>
                            ))
-                       ) : (<div className="text-center py-20 text-gray-500 bg-white rounded-xl border border-gray-100">No shoes found for selected filters.</div>)}
+                       ) : (<div className="text-center py-20 text-gray-500 bg-white/80 rounded-xl border border-gray-100">No shoes found for selected filters.</div>)}
                    </div>
                </div>
            </div>
+           <Footer />
         </div>
       );
   }
 
   // --- FORM INPUT ---
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 font-sans animate-in fade-in duration-500">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative">
-        <button onClick={() => setStep("menu")} className="absolute top-4 left-4 text-[10px] font-bold text-gray-400 hover:text-orange-500">← BACK</button>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 font-sans animate-in fade-in duration-500" style={gridStyle}>
+      <div className="bg-white/90 backdrop-blur-md rounded-xl shadow-2xl w-full max-w-md p-6 relative border border-gray-100">
+        <button onClick={() => setStep("menu")} className="absolute top-4 left-4 text-[10px] font-bold text-gray-400 hover:text-orange-500 bg-gray-50 px-2 py-1 rounded-full">← BACK</button>
         <h1 className="text-center font-serif font-bold text-lg mb-1 mt-4 uppercase tracking-wider">{step === "road" ? "User Input Road" : "User Input Trail"}</h1>
         {error && (<div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2"><span>{error}</span><Link to="/login" className="px-4 py-1.5 bg-red-600 text-white text-[10px] font-bold rounded-full hover:bg-red-700 transition-colors">Go to Login</Link></div>)}
-        <div className="text-right mb-4"><button onClick={handleUseProfile} disabled={profileLoading} className="text-[10px] italic text-gray-500 hover:text-blue-600 underline disabled:opacity-50">{profileLoading ? "Loading Profile..." : "Use My Profile"}</button></div>
+        <div className="text-right mb-4"><button onClick={handleUseProfile} disabled={profileLoading} className="text-[12px] italic text-gray-500 hover:text-blue-600 underline disabled:opacity-50">{profileLoading ? "Loading Profile..." : "Use My Profile"}</button></div>
         
         {/* INPUT: Foot Width */}
-        <div className="mb-6 text-left"><label className="block text-xs font-bold mb-3 uppercase text-gray-700">Foot Width Type <span className="text-red-500">*</span></label><div className="grid grid-cols-3 gap-3">{widthOptions.map((opt) => (<button key={opt.label} onClick={() => handleToggleSelect('footWidth', opt.value)} className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center transition-all ${commonData.footWidth === opt.value ? activeStyle : inactiveStyle}`}><img src={opt.img} alt={opt.label} className="h-10 w-auto mb-2" /><span className="text-[10px] font-bold">{opt.label}</span></button>))}</div></div>
+        <div className="mb-6 text-left"><label className="block text-sm font-bold mb-3 uppercase text-gray-800">Foot Width Type <span className="text-red-500">*</span></label><div className="grid grid-cols-3 gap-3">{widthOptions.map((opt) => (<button key={opt.label} onClick={() => handleToggleSelect('footWidth', opt.value)} className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center transition-all ${commonData.footWidth === opt.value ? activeStyle : inactiveStyle}`}><img src={opt.img} alt={opt.label} className="h-10 w-auto mb-2" /><span className="text-[12px] font-bold">{opt.label}</span></button>))}</div></div>
         
         {/* INPUT: Arch Type */}
-        <div className="mb-6 text-left"><label className="block text-xs font-bold mb-3 uppercase text-gray-700">Arch Type <span className="text-red-500">*</span></label><div className="grid grid-cols-3 gap-3">{archOptions.map((opt) => (<button key={opt.label} onClick={() => handleToggleSelect('archType', opt.value)} className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center transition-all ${commonData.archType === opt.value ? activeStyle : inactiveStyle}`}><img src={opt.img} alt={opt.label} className="h-8 w-auto mb-2" /><span className="text-[10px] font-bold leading-tight">{opt.label}</span></button>))}</div></div>
+        <div className="mb-6 text-left"><label className="block text-sm font-bold mb-3 uppercase text-gray-800">Arch Type <span className="text-red-500">*</span></label><div className="grid grid-cols-3 gap-3">{archOptions.map((opt) => (<button key={opt.label} onClick={() => handleToggleSelect('archType', opt.value)} className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center transition-all ${commonData.archType === opt.value ? activeStyle : inactiveStyle}`}><img src={opt.img} alt={opt.label} className="h-8 w-auto mb-2" /><span className="text-[12px] font-bold leading-tight">{opt.label}</span></button>))}</div></div>
         
         {/* INPUT: Orthotics */}
-        <div className="mb-6 text-left"><label className="block text-xs font-bold mb-3 uppercase text-gray-700">Orthotics Usage <span className="text-red-500">*</span></label><div className="grid grid-cols-2 gap-4">{['Yes', 'No'].map(val => (<button key={val} onClick={() => handleToggleSelect('orthotics', val)} className={`cursor-pointer border-2 rounded-xl p-4 flex flex-col items-center justify-center transition-all ${commonData.orthotics === val ? 'border-blue-600 bg-blue-50 scale-105 shadow-md text-blue-900' : 'border-gray-200 hover:border-blue-400 hover:shadow-sm text-gray-600'}`}><span className="text-xs font-bold text-center">{val === 'Yes' ? 'Yes, I use orthotics' : "No, I don't"}</span></button>))}</div></div>
+        <div className="mb-6 text-left"><label className="block text-sm font-bold mb-3 uppercase text-gray-800">Orthotics Usage <span className="text-red-500">*</span></label><div className="grid grid-cols-2 gap-4">{['Yes', 'No'].map(val => (<button key={val} onClick={() => handleToggleSelect('orthotics', val)} className={`cursor-pointer border-2 rounded-xl p-4 flex flex-col items-center justify-center transition-all ${commonData.orthotics === val ? activeStyle : inactiveStyle}`}><span className="text-xs font-bold text-center">{val === 'Yes' ? 'Yes, I use orthotics' : "No, I don't"}</span></button>))}</div></div>
 
         {/* FORM LANJUTAN */}
-        {step === "road" ? (<SelectionGroup label="Running Purpose" options={['Daily', 'Tempo', 'Race']} category="purpose" required />) : (<div className="mb-6 text-left"><label className="block text-xs font-bold mb-3 uppercase text-gray-700">Trail Terrain <span className="text-red-500">*</span></label><div className="grid grid-cols-2 gap-4">{['Mixed', 'Rocky', 'Muddy', 'Light'].map(t => (<button key={t} onClick={() => handleToggleSelect('terrain', t)} className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all ${trailData.terrain === t ? activeStyle : inactiveStyle}`}><span className={`text-[11px] font-bold ${trailData.terrain === t ? 'text-blue-900' : 'text-gray-600'}`}>{t}</span></button>))}</div></div>)}
+        {step === "road" ? (<SelectionGroup label="Running Purpose" options={['Daily', 'Tempo', 'Race']} category="purpose" required />) : (<div className="mb-6 text-left"><label className="block text-sm font-bold mb-3 uppercase text-gray-800">Trail Terrain <span className="text-red-500">*</span></label><div className="grid grid-cols-2 gap-4">{['Mixed', 'Rocky', 'Muddy', 'Light'].map(t => (<button key={t} onClick={() => handleToggleSelect('terrain', t)} className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all ${trailData.terrain === t ? activeStyle : inactiveStyle}`}><span className={`text-[12px] font-bold ${trailData.terrain === t ? 'text-blue-900' : 'text-gray-700'}`}>{t}</span></button>))}</div></div>)}
 
-        <div className="text-center mt-2"><button onClick={() => setShowMore(!showMore)} className="text-[10px] font-bold text-gray-500 hover:text-black uppercase tracking-tighter transition-all border-b border-transparent hover:border-black">{showMore ? 'show less input -' : 'show more input +'}</button></div>
+        <div className="text-center mt-2">
+          <button 
+            onClick={() => setShowMore(!showMore)} 
+            className="flex items-center justify-center gap-1 mx-auto text-[12px] font-bold text-black hover:text-gray-600 uppercase tracking-tighter transition-all border-b border-transparent hover:border-black group"
+          >
+            <span>{showMore ? 'show less input' : 'show more input'}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className={`w-3 h-3 transition-transform duration-300 ${showMore ? 'rotate-180' : ''}`}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 5.25l-7.5 7.5-7.5-7.5m15 6l-7.5 7.5-7.5-7.5" />
+            </svg>
+          </button>
+        </div>
         
         {showMore && (
             <div className="mt-4 border-t pt-4 animate-in slide-in-from-top-2 duration-300">
-                <div className="mb-4 text-left"><label className="block text-xs font-bold mb-2 uppercase text-gray-600">Pace Target (Optional)</label><div className="grid grid-cols-3 gap-2">{[{ l: 'Easy', t: '(6:30 min/km)' }, { l: 'Steady', t: '(5-6:30 min/km)' }, { l: 'Fast', t: '(<5:00 min/km)' }].map(p => {const currentPace = step === "road" ? roadData.pace : trailData.pace;return (<button key={p.l} onClick={() => handleToggleSelect('pace', p.l)} className={`border-2 p-1 rounded-xl transition-all ${currentPace === p.l ? 'border-blue-600 bg-blue-50 text-blue-900 scale-105 shadow-md' : 'border-gray-200 text-gray-600 hover:border-blue-300'}`}><p className="text-[9px] font-bold">{p.l}</p><p className="text-[7px] font-medium opacity-80">{p.t}</p></button>);})}</div></div>
+                <div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Pace Target (Optional)</label><div className="grid grid-cols-3 gap-2">{[{ l: 'Easy', t: '(6:30 min/km)' }, { l: 'Steady', t: '(5-6:30 min/km)' }, { l: 'Fast', t: '(<5:00 min/km)' }].map(p => {const currentPace = step === "road" ? roadData.pace : trailData.pace;return (<button key={p.l} onClick={() => handleToggleSelect('pace', p.l)} className={`border-2 p-1 rounded-xl transition-all ${currentPace === p.l ? activeStyle : inactiveStyle}`}><p className="text-[12px] font-bold">{p.l}</p><p className="text-[8px] font-bold opacity-80">{p.t}</p></button>);})}</div></div>
                 {step === "road" && <SelectionGroup label="Cushion Preference (Optional)" options={['Soft', 'Balanced', 'Firm']} category="cushion" />}
                 <SelectionGroup label="Season (Optional)" options={['Summer', 'Spring & Fall', 'Winter']} category="season" />
-                {step === "road" && (<div className="mb-4 text-left"><label className="block text-xs font-bold mb-2 uppercase text-gray-600">Stability Need (Optional)</label><div className="flex gap-2 w-2/3">{['Neutral', 'Guided'].map(s => (<button key={s} onClick={() => handleToggleSelect('stability', s)} className={`flex-1 py-2 rounded-xl text-[10px] border-2 transition-all ${roadData.stability === s ? 'border-blue-600 bg-blue-50 text-blue-900 scale-105 shadow-md font-bold' : 'border-gray-200 text-gray-600 hover:border-blue-300'}`}>{s}</button>))}</div></div>)}
-                <div className="mb-4 text-left"><label className="block text-xs font-bold mb-2 uppercase text-gray-600">Strike pattern (Optional)</label><div className="flex gap-4 text-[10px]">{['Heel', 'Mid', 'Forefoot'].map(s => {const currentStrike = step === "road" ? roadData.strike : trailData.strike;return (<button key={s} onClick={() => handleToggleSelect('strike', s)} className="flex items-center gap-2 group"><div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-all ${currentStrike === s ? 'border-blue-600 bg-blue-50' : 'border-gray-300 group-hover:border-blue-400'}`}>{currentStrike === s && <div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>}</div><span className={currentStrike === s ? 'text-blue-900 font-bold' : 'text-gray-600'}>{s}</span></button>);})}</div></div>
-                {step === "trail" && (<><div className="mb-4 text-left"><label className="block text-xs font-bold mb-2 uppercase text-gray-600">Water Resistant (Optional)</label><div className="flex gap-4 text-[10px]">{['Waterproof', 'Water Repellent'].map(w => (<button key={w} onClick={() => handleToggleSelect('waterResistant', w)} className="flex items-center gap-2 group"><div className={`w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all ${trailData.waterResistant === w ? 'border-blue-600 bg-blue-50' : 'border-gray-300 group-hover:border-blue-400'}`}>{trailData.waterResistant === w && <span className="text-blue-600 text-[8px]">✓</span>}</div><span className={trailData.waterResistant === w ? 'text-blue-900 font-bold' : 'text-gray-600'}>{w}</span></button>))}</div></div><div className="mb-4 text-left"><label className="block text-xs font-bold mb-2 uppercase text-gray-600">Rock Sensitivity (Optional)</label><div className="flex gap-4 text-[10px]">{['Yes', 'No'].map(r => (<button key={r} onClick={() => handleToggleSelect('rockSensitivity', r)} className="flex items-center gap-2 group"><div className={`w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all ${trailData.rockSensitivity === r ? 'border-blue-600 bg-blue-50' : 'border-gray-300 group-hover:border-blue-400'}`}>{trailData.rockSensitivity === r && <span className="text-blue-600 text-[8px]">✓</span>}</div><span className={trailData.rockSensitivity === r ? 'text-blue-900 font-bold' : 'text-gray-600'}>{r}</span></button>))}</div></div></>)}
+                {step === "road" && (<div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Stability Need (Optional)</label><div className="flex gap-2 w-2/3">{['Neutral', 'Guided'].map(s => (<button key={s} onClick={() => handleToggleSelect('stability', s)} className={`flex-1 py-2 rounded-xl text-[12px] border-2 transition-all ${roadData.stability === s ? activeStyle : inactiveStyle}`}>{s}</button>))}</div></div>)}
+                <div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Strike pattern (Optional)</label><div className="flex gap-4 text-[12px]">{['Heel', 'Mid', 'Forefoot'].map(s => {const currentStrike = step === "road" ? roadData.strike : trailData.strike;return (<button key={s} onClick={() => handleToggleSelect('strike', s)} className="flex items-center gap-2 group"><div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${currentStrike === s ? 'border-blue-600 bg-blue-50' : 'border-gray-300 group-hover:border-blue-400'}`}>{currentStrike === s && <div className="w-2 h-2 bg-blue-600 rounded-full"></div>}</div><span className={currentStrike === s ? 'text-blue-900 font-bold' : 'text-gray-700 font-bold'}>{s}</span></button>);})}</div></div>
+                {step === "trail" && (<><div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Water Resistant (Optional)</label><div className="flex gap-4 text-[12px]">{['Waterproof', 'Water Repellent'].map(w => (<button key={w} onClick={() => handleToggleSelect('waterResistant', w)} className="flex items-center gap-2 group"><div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${trailData.waterResistant === w ? 'border-blue-600 bg-blue-50' : 'border-gray-300 group-hover:border-blue-400'}`}>{trailData.waterResistant === w && <span className="text-blue-600 text-[10px]">✓</span>}</div><span className={trailData.waterResistant === w ? 'text-blue-900 font-bold' : 'text-gray-700 font-bold'}>{w}</span></button>))}</div></div><div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Rock Sensitivity (Optional)</label><div className="flex gap-4 text-[12px]">{['Yes', 'No'].map(r => (<button key={r} onClick={() => handleToggleSelect('rockSensitivity', r)} className="flex items-center gap-2 group"><div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${trailData.rockSensitivity === r ? 'border-blue-600 bg-blue-50' : 'border-gray-300 group-hover:border-blue-400'}`}>{trailData.rockSensitivity === r && <span className="text-blue-600 text-[10px]">✓</span>}</div><span className={trailData.rockSensitivity === r ? 'text-blue-900 font-bold' : 'text-gray-700 font-bold'}>{r}</span></button>))}</div></div></>)}
             </div>
         )}
       </div>
@@ -546,6 +487,7 @@ export default function Recommendation() {
       >
         {loading ? 'Finding...' : isContextLoading ? 'Loading Database...' : 'Find'}
       </button>
+      <Footer />
     </div>
   );
 }
