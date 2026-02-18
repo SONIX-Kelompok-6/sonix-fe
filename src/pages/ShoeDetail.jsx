@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { FaHeart, FaRegHeart, FaStar, FaPlus } from "react-icons/fa";
-import { sendInteraction } from "../services/SonixMl";
+import { sendInteraction } from "../services/SonixMl"; // 🔥 ML Service is BACK
 import Navbar from "../components/Navbar";
 import api from "../api/axios";
 import { useShoes } from "../context/ShoeContext"; 
@@ -10,13 +10,34 @@ export default function ShoeDetail() {
   const { slug } = useParams();
   const { allShoes, updateShoeState } = useShoes(); 
 
-  const [shoeData, setShoeData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // --- 🔥 1. INSTANT STATE INITIALIZATION (SPEED HACK) 🔥 ---
+  // Cari data SEBELUM render pertama.
+  const [shoeData, setShoeData] = useState(() => {
+      // A. Cek Cache Detail (LocalStorage) - Data lengkap
+      try {
+          const localKey = `shoe_detail_${slug}`;
+          const cached = localStorage.getItem(localKey);
+          if (cached) return JSON.parse(cached);
+      } catch (e) { console.warn(e); }
+
+      // B. Cek Context Global (RAM) - Data basic
+      if (allShoes && allShoes.length > 0) {
+          const found = allShoes.find(s => 
+              s.slug === slug || String(s.shoe_id) === slug || String(s.id) === slug
+          );
+          if (found) return found;
+      }
+
+      return null;
+  });
+
+  const [isLoading, setIsLoading] = useState(!shoeData);
   const [error, setError] = useState(null);
   const [newReview, setNewReview] = useState({ rating: 0, text: "" });
 
   // --- LOGIC GUEST NAME ---
   const token = localStorage.getItem("userToken");
+  const userId = localStorage.getItem("userId"); // Ambil User ID buat ML
   const userEmail = localStorage.getItem("userEmail");
   const userName = localStorage.getItem("userName");
 
@@ -37,67 +58,47 @@ export default function ShoeDetail() {
     return "User"; 
   })();
 
-  // --- UPDATE 1: LOGIC LOAD DATA DENGAN DETAIL CACHE ---
+  // --- 🔥 2. BACKGROUND FETCH & ML TRIGGER 🔥 ---
   useEffect(() => {
-    const loadData = async () => {
-      // A. Cek "Cache Khusus Detail" (Prioritas Utama - Data Lengkap)
+    const syncData = async () => {
       const localDetailKey = `shoe_detail_${slug}`;
-      const localDetailCache = localStorage.getItem(localDetailKey);
-
-      if (localDetailCache) {
-         try {
-           const parsedData = JSON.parse(localDetailCache);
-           setShoeData(parsedData); 
-           setIsLoading(false);
-         } catch (e) {
-           console.warn("Cache parse error", e);
-         }
-      } else {
-         // B. Kalau gak ada cache detail, cek Global Cache
-         const globalCache = allShoes.find((s) => s.slug === slug);
-         if (globalCache) {
-            setShoeData(prev => ({ ...globalCache, ...prev })); 
-            setIsLoading(false);
-         } else {
-            setIsLoading(true);
-         }
-      }
-
-      setError(null);
-
+      
       try {
-        // C. Fetch Data Terbaru dari Server (Background Sync)
         const token = localStorage.getItem("userToken");
+        // Request ke server untuk data paling fresh
         const response = await api.get(
           `/api/shoes/${slug}/`,
           { headers: token ? { Authorization: `Token ${token}` } : {} }
         );
         
         const freshData = response.data;
+        
+        // Update State & Cache & Context
         setShoeData(freshData);
-
-        // 🔥 SIMPAN KE CACHE KHUSUS 
         localStorage.setItem(localDetailKey, JSON.stringify(freshData));
 
-        // Sync ke Global Context
         const updatedGlobalList = allShoes.map(s => 
             s.shoe_id === freshData.shoe_id ? { ...s, ...freshData } : s
         );
         updateShoeState(updatedGlobalList);
 
-      } catch (err) {
-        console.error("Error fetching detail:", err);
-        if (!shoeData && !localDetailCache) {
-           setError("Oops! The shoe you are looking for could not be found.");
+        // 🔥 ML TRIGGER: CLICK / VIEW (Implicit Feedback)
+        // Kita kirim sinyal bahwa user "tertarik" (click) barang ini
+        if (userId && freshData.shoe_id) {
+            sendInteraction(userId, freshData.shoe_id, 'click', 1).catch(err => 
+                console.warn("[ML] Gagal kirim click data", err)
+            );
         }
+
+      } catch (err) {
+        console.error("Background sync error:", err);
+        if (!shoeData) setError("Oops! The shoe you are looking for could not be found.");
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (slug) {
-      loadData();
-    }
+    if (slug) syncData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]); 
 
@@ -110,7 +111,6 @@ export default function ShoeDetail() {
       return;
     }
 
-    const token = localStorage.getItem("userToken");
     if (!token) {
       alert("Please login first to submit a review.");
       return;
@@ -130,7 +130,7 @@ export default function ShoeDetail() {
     const currentSumRating = currentReviews.reduce((sum, r) => sum + r.rating, 0);
     const updatedAverage = (currentSumRating + newReview.rating) / newTotalReviews;
 
-    // Optimistic Update Lokal
+    // Optimistic Update
     const updatedShoeData = {
         ...shoeData,
         rating: Number(updatedAverage.toFixed(1)), 
@@ -139,11 +139,8 @@ export default function ShoeDetail() {
 
     setShoeData(updatedShoeData);
     setNewReview({ rating: 0, text: "" }); 
-
-    // 🔥 UPDATE JUGA CACHE KHUSUS
     localStorage.setItem(`shoe_detail_${slug}`, JSON.stringify(updatedShoeData));
 
-    // Update Global Context
     const updatedGlobalList = allShoes.map(s => 
         s.shoe_id === shoeData.shoe_id ? { ...s, rating: updatedShoeData.rating } : s
     );
@@ -159,6 +156,15 @@ export default function ShoeDetail() {
         },
         { headers: { Authorization: `Token ${token}` } }
       );
+
+      // 🔥 ML TRIGGER: RATE & REVIEW
+      if (userId) {
+          // Kirim Rating (Explicit Feedback kuat)
+          sendInteraction(userId, shoeData.shoe_id, 'rate', newReview.rating).catch(console.warn);
+          // Kirim Review (Menandakan engagement tinggi)
+          sendInteraction(userId, shoeData.shoe_id, 'review', 1).catch(console.warn);
+      }
+
     } catch (err) {
       console.error("Failed to submit review:", err);
       alert("Failed to submit review. Please check your connection.");
@@ -167,9 +173,6 @@ export default function ShoeDetail() {
 
 
   const handleToggleFavorite = async () => {
-    const token = localStorage.getItem("userToken");
-    const userId = localStorage.getItem("userId"); 
-
     if (!token) {
       alert("Please login first to save this shoe to your favorites.");
       return;
@@ -177,16 +180,13 @@ export default function ShoeDetail() {
 
     const previousStatus = shoeData.isFavorite;
     const newStatus = !previousStatus;
-    const interactionValue = previousStatus ? 0 : 1;
+    const interactionValue = newStatus ? 1 : 0; // 1 = Like, 0 = Unlike (Netral/Dislike)
 
-    // Update UI Lokal
+    // Optimistic Update
     const updatedShoeData = { ...shoeData, isFavorite: newStatus };
     setShoeData(updatedShoeData);
-
-    // Update Cache Khusus
     localStorage.setItem(`shoe_detail_${slug}`, JSON.stringify(updatedShoeData));
 
-    // Update Context Global
     const updatedGlobalList = allShoes.map(s => 
         s.shoe_id === shoeData.shoe_id ? { ...s, isFavorite: newStatus } : s
     );
@@ -198,14 +198,18 @@ export default function ShoeDetail() {
         { shoe_id: String(shoeData.shoe_id) }, 
         { headers: { Authorization: `Token ${token}` } }
       );
-      
+
+      // 🔥 ML TRIGGER: LIKE
       if (userId) {
+          // Kirim Like ke ML.
+          // Note: Beberapa model ML mungkin butuh 'unlike' (value 0) atau cuma butuh 'like' (value 1) aja.
+          // Di sini kita kirim statusnya.
           sendInteraction(userId, shoeData.shoe_id, 'like', interactionValue).catch(console.warn);
       }
 
     } catch (err) {
       console.error("Failed to update favorite:", err);
-      // Rollback logic...
+      // Rollback
       setShoeData({ ...shoeData, isFavorite: previousStatus });
       updateShoeState(allShoes); 
       alert("Something went wrong. Please try again later.");
@@ -248,17 +252,11 @@ export default function ShoeDetail() {
         <div className="bg-white rounded-3xl overflow-hidden shadow-xl">
           <div className="flex flex-col md:flex-row">
             <div className="md:w-1/2 p-8 flex items-center justify-center bg-gray-100">
-              
-              {/* --- UPDATE BAGIAN GAMBAR DI SINI --- */}
               <img
                 src={shoeData.mainImage || shoeData.img_url || "https://via.placeholder.com/500"} 
                 alt={shoeData.model}
-                // Ubah styling di bawah ini:
-                // 'w-3/4' : Lebar 75% dari container
-                // 'max-w-md' : Maksimal lebar Medium (sekitar 400px-an) agar tidak raksasa di layar besar
                 className="w-3/4 max-w-md h-auto object-contain transform hover:scale-105 transition-transform duration-300 drop-shadow-lg"
               />
-
             </div>
 
             <div className="md:w-1/2 p-8 flex flex-col justify-center bg-[#e9eef5]">
@@ -293,6 +291,19 @@ export default function ShoeDetail() {
           </div>
         </div>
 
+        <div className="mt-8">
+          <h2 className="text-3xl font-bold text-white text-center mb-6 tracking-wider">EXPLORE</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {shoeData.explore?.map((item) => (
+              <Link to={`/shoe/${item.slug}`} key={item.id} className="bg-[#e9eef5] rounded-xl overflow-hidden shadow-md border-4 border-orange-300 hover:border-orange-500 transition-all group">
+                <div className="p-6 flex items-center justify-center">
+                  <img src={item.image} alt="Explore Shoe" className="max-w-full h-auto group-hover:scale-105 transition-transform duration-300" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
         {/* --- TECH SPECS MANUAL LAYOUT --- */}
         <div className="mt-12">
           <h2 className="text-3xl font-black text-white text-center mb-8 tracking-widest uppercase">
@@ -300,8 +311,6 @@ export default function ShoeDetail() {
           </h2>
 
           <div className="bg-white rounded-3xl p-8 shadow-2xl border border-gray-100">
-            
-            {/* LOGIC VARIABLES */}
             {(() => {
               const isTrail = String(shoeData.shoe_id).toUpperCase().startsWith('T');
               const isRoad = !isTrail;
@@ -330,10 +339,8 @@ export default function ShoeDetail() {
 
               return (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                  
-                  {/* ======================= KOLOM 1: GENERAL ======================= */}
+                  {/* KOLOM 1 */}
                   <div className="space-y-5 lg:border-l lg:border-gray-200 lg:pl-6">
-                    
                     {isTrail && (
                       <div>
                         <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Best For Terrain</p>
@@ -368,18 +375,15 @@ export default function ShoeDetail() {
                       <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Plate</p>
                       <p className="text-gray-800 font-bold">{shoeData.plate ? "✅" : "❌"}</p>
                     </div>
-                    
                     <div>
                       <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Strike Pattern</p>
                       <p className="text-gray-800 font-bold">
                         {shoeData.strike_heel ? "Heel" : shoeData.strike_mid ? "Midfoot" : shoeData.strike_forefoot ? "Forefoot" : "-"}
                       </p>
                     </div>
-
                   </div>
 
-
-                  {/* ======================= KOLOM 2 ======================= */}
+                  {/* KOLOM 2 */}
                   <div className="space-y-5 lg:border-l lg:border-gray-200 lg:pl-6">
                     <div>
                       <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Heel Stack</p>
@@ -393,7 +397,6 @@ export default function ShoeDetail() {
                       <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Drop</p>
                       <p className="text-gray-800 font-bold">{shoeData.drop_lab_mm ? `${shoeData.drop_lab_mm} mm` : "-"}</p>
                     </div>
-
                     <div>
                       <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Weight</p>
                       <p className="text-gray-800 font-bold">{shoeData.weight_lab_oz ? `${shoeData.weight_lab_oz} oz` : "-"}</p>
@@ -426,8 +429,7 @@ export default function ShoeDetail() {
                     )}
                   </div>
 
-
-                  {/* ======================= KOLOM 3: MIDSOLE & DURABILITY ======================= */}
+                  {/* KOLOM 3 */}
                   <div className="space-y-5 lg:border-l lg:border-gray-200 lg:pl-6">
                     <div>
                       <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Midsole Softness</p>
@@ -454,7 +456,6 @@ export default function ShoeDetail() {
                         shoeData.breathability_scaled === 5 ? "Breathable" : "-"}
                       </p>
                     </div>
-                    
                     <div>
                       <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Toebox Durability</p>
                       <p className="text-gray-800 font-bold">
@@ -465,7 +466,6 @@ export default function ShoeDetail() {
                         shoeData.toebox_durability === 5 ? "Very Good" : "-"}
                       </p>
                     </div>
-
                     <div>
                       <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Heel Padding Durability</p>
                       <p className="text-gray-800 font-bold">
@@ -476,7 +476,6 @@ export default function ShoeDetail() {
                         shoeData.heel_durability === 5 ? "Very Good" : "-"}
                       </p>
                     </div>
-
                     <div>
                       <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Outsole Durability</p>
                       <p className="text-gray-800 font-bold">
@@ -487,7 +486,6 @@ export default function ShoeDetail() {
                         shoeData.outsole_durability === 5 ? "Very Good" : "-"}
                       </p>
                     </div>
-
                     {isTrail && (
                       <div>
                         <p className="text-gray-400 text-xs font-bold">Energy Return</p>
@@ -500,17 +498,14 @@ export default function ShoeDetail() {
                     )}
                   </div>
 
-
-                  {/* ======================= KOLOM 4: FIT & TRAIL SPECIFIC ======================= */}
+                  {/* KOLOM 4 */}
                   <div className="space-y-5 lg:border-l lg:border-gray-200 lg:pl-6">
-
                     {isRoad && (
                       <div>
                         <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Best For Pace</p>
                         <p className="text-gray-800 font-bold">{renderPace()}</p>
                       </div>
                     )}
-
                     <div>
                       <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Width Fit</p>
                       <p className="text-gray-800 font-bold">
@@ -533,7 +528,6 @@ export default function ShoeDetail() {
                         {shoeData.season_all ? "All Season" : shoeData.season_summer ? "Summer" : "Winter"}
                       </p>
                     </div>
-
                     {isTrail && (
                       <div className="space-y-5">
                         <div>
@@ -554,9 +548,7 @@ export default function ShoeDetail() {
                         </div>
                       </div>
                     )}
-                    
                   </div>
-
                 </div>
               );
             })()}
