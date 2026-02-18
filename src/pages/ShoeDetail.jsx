@@ -4,12 +4,10 @@ import { FaHeart, FaRegHeart, FaStar, FaPlus } from "react-icons/fa";
 import { sendInteraction } from "../services/SonixMl";
 import Navbar from "../components/Navbar";
 import api from "../api/axios";
-import { useShoes } from "../context/ShoeContext"; // 1. IMPORT CONTEXT
+import { useShoes } from "../context/ShoeContext"; 
 
 export default function ShoeDetail() {
   const { slug } = useParams();
-  
-  // Ambil data global untuk instant load & sync
   const { allShoes, updateShoeState } = useShoes(); 
 
   const [shoeData, setShoeData] = useState(null);
@@ -39,40 +37,59 @@ export default function ShoeDetail() {
     return "User"; 
   })();
 
-  // --- 2. UPDATE: INSTANT LOAD STRATEGY ---
+  // --- UPDATE 1: LOGIC LOAD DATA DENGAN DETAIL CACHE ---
   useEffect(() => {
     const loadData = async () => {
-      // A. Cek Cache Dulu (Biar Instant)
-      const cachedShoe = allShoes.find((s) => s.slug === slug);
-      
-      if (cachedShoe) {
-        // Kalau ada di cache, tampilkan langsung!
-        setShoeData(prev => ({ ...cachedShoe, ...prev })); // Merge biar gak ilang data detail
-        setIsLoading(false); 
+      // A. Cek "Cache Khusus Detail" (Prioritas Utama - Data Lengkap)
+      // Ini menyimpan Review & Rating lengkap dari kunjungan terakhir
+      const localDetailKey = `shoe_detail_${slug}`;
+      const localDetailCache = localStorage.getItem(localDetailKey);
+
+      if (localDetailCache) {
+         try {
+           const parsedData = JSON.parse(localDetailCache);
+           setShoeData(parsedData); // BOOM! Data lengkap (Review dll) langsung muncul
+           setIsLoading(false);
+         } catch (e) {
+           console.warn("Cache parse error", e);
+         }
       } else {
-        // Kalau gak ada di cache, baru set loading true
-        setIsLoading(true);
+         // B. Kalau gak ada cache detail, cek Global Cache (Minimal Gambar & Nama muncul)
+         const globalCache = allShoes.find((s) => s.slug === slug);
+         if (globalCache) {
+            setShoeData(prev => ({ ...globalCache, ...prev })); 
+            setIsLoading(false);
+         } else {
+            setIsLoading(true);
+         }
       }
 
       setError(null);
 
       try {
-        console.log("Fetching full details for:", slug);
+        // C. Fetch Data Terbaru dari Server (Background Sync)
         const token = localStorage.getItem("userToken");
-
-        // B. Fetch Data Lengkap dari Server (Background Sync)
-        // Kita butuh ini untuk dapet Review & Data Explore yg mungkin gak ada di list biasa
         const response = await api.get(
           `/api/shoes/${slug}/`,
           { headers: token ? { Authorization: `Token ${token}` } : {} }
         );
         
-        // Update state dengan data terlengkap dari server
-        setShoeData(response.data);
+        const freshData = response.data;
+        setShoeData(freshData);
+
+        // 🔥 SIMPAN KE CACHE KHUSUS (Biar pas refresh berikutnya ngebut)
+        localStorage.setItem(localDetailKey, JSON.stringify(freshData));
+
+        // Sync ke Global Context (Biar page Favorites update ratingnya)
+        const updatedGlobalList = allShoes.map(s => 
+            s.shoe_id === freshData.shoe_id ? { ...s, ...freshData } : s
+        );
+        updateShoeState(updatedGlobalList);
 
       } catch (err) {
         console.error("Error fetching detail:", err);
-        if (!cachedShoe) {
+        // Kalau cache juga gak ada, baru error
+        if (!shoeData && !localDetailCache) {
            setError("Oops! The shoe you are looking for could not be found.");
         }
       } finally {
@@ -83,10 +100,10 @@ export default function ShoeDetail() {
     if (slug) {
       loadData();
     }
-  }, [slug, allShoes.length]); // Dependency ke allShoes.length biar update kalau context berubah
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug]); 
 
 
-  // --- 3. UPDATE: OPTIMISTIC REVIEW SUBMIT ---
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
     
@@ -101,9 +118,8 @@ export default function ShoeDetail() {
       return;
     }
 
-    // A. Siapkan Data Review Baru
     const addedReview = {
-        id: Date.now(), // ID sementara
+        id: Date.now(), 
         user: currentUserName,
         avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=" + currentUserName,
         date: "Just now",
@@ -111,25 +127,31 @@ export default function ShoeDetail() {
         rating: newReview.rating,
     };
 
-    // B. Hitung Rating Baru secara Lokal
     const currentReviews = shoeData.reviews || [];
     const newTotalReviews = currentReviews.length + 1;
     const currentSumRating = currentReviews.reduce((sum, r) => sum + r.rating, 0);
     const updatedAverage = (currentSumRating + newReview.rating) / newTotalReviews;
 
-    // C. UPDATE UI DULUAN (Optimistic)
-    const previousShoeData = { ...shoeData }; // Simpan state lama buat jaga-jaga
-    
-    setShoeData({
+    // Optimistic Update Lokal
+    const updatedShoeData = {
         ...shoeData,
         rating: Number(updatedAverage.toFixed(1)), 
         reviews: [addedReview, ...currentReviews],
-    });
-    
-    setNewReview({ rating: 0, text: "" }); // Reset form langsung
+    };
+
+    setShoeData(updatedShoeData);
+    setNewReview({ rating: 0, text: "" }); 
+
+    // 🔥 UPDATE 2: UPDATE JUGA CACHE KHUSUS (Biar pas refresh review barunya gak ilang)
+    localStorage.setItem(`shoe_detail_${slug}`, JSON.stringify(updatedShoeData));
+
+    // Update Global Context
+    const updatedGlobalList = allShoes.map(s => 
+        s.shoe_id === shoeData.shoe_id ? { ...s, rating: updatedShoeData.rating } : s
+    );
+    updateShoeState(updatedGlobalList);
 
     try {
-      // D. KIRIM KE SERVER (Background Process)
       await api.post(
         "/api/add-review/",
         {
@@ -139,21 +161,13 @@ export default function ShoeDetail() {
         },
         { headers: { Authorization: `Token ${token}` } }
       );
-
-      // Sukses? Gak perlu ngapa-ngapain karena UI udah update.
-      console.log("Review synced to server.");
-
     } catch (err) {
       console.error("Failed to submit review:", err);
-      // E. Kalau Gagal, Balikin UI ke Awal (Rollback)
-      setShoeData(previousShoeData); 
-      setNewReview({ rating: addedReview.rating, text: addedReview.text }); // Balikin teks user
       alert("Failed to submit review. Please check your connection.");
     }
   };
 
 
-  // --- 4. UPDATE: SYNC FAVORITE KE GLOBAL CONTEXT ---
   const handleToggleFavorite = async () => {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId"); 
@@ -167,51 +181,47 @@ export default function ShoeDetail() {
     const newStatus = !previousStatus;
     const interactionValue = previousStatus ? 0 : 1;
 
-    // A. Update UI Halaman Detail (Lokal)
-    setShoeData({ ...shoeData, isFavorite: newStatus });
+    // Update UI Lokal
+    const updatedShoeData = { ...shoeData, isFavorite: newStatus };
+    setShoeData(updatedShoeData);
 
-    // B. Update Context Global (Supaya Page Favorite & Search ikut berubah)
-    // Kita cari sepatu ini di array global, update statusnya, lalu simpan balik
+    // Update Cache Khusus (Biar pas refresh statusnya inget)
+    localStorage.setItem(`shoe_detail_${slug}`, JSON.stringify(updatedShoeData));
+
+    // Update Context Global
     const updatedGlobalList = allShoes.map(s => 
         s.shoe_id === shoeData.shoe_id ? { ...s, isFavorite: newStatus } : s
     );
-    updateShoeState(updatedGlobalList); // <-- INI KUNCINYA
+    updateShoeState(updatedGlobalList); 
 
     try {
-      // C. Call API
       await api.post(
         "/api/favorites/toggle/",
-        { shoe_id: String(shoeData.shoe_id) }, // Pastikan string biar aman
+        { shoe_id: String(shoeData.shoe_id) }, 
         { headers: { Authorization: `Token ${token}` } }
       );
       
-      // ML Interaction
       if (userId) {
           sendInteraction(userId, shoeData.shoe_id, 'like', interactionValue).catch(console.warn);
       }
 
     } catch (err) {
       console.error("Failed to update favorite:", err);
-      
-      // Rollback Lokal
+      // Rollback logic...
       setShoeData({ ...shoeData, isFavorite: previousStatus });
-      // Rollback Global
       updateShoeState(allShoes); 
       alert("Something went wrong. Please try again later.");
     }
   };
 
-  // --- ADD TO COMPARE (TETAP) ---
   const handleAddCompare = () => {
     if (!shoeData) return;
-
     let compareList = JSON.parse(localStorage.getItem("compareList")) || [];
 
     if (compareList.some((item) => item.shoe_id === shoeData.shoe_id)) {
       alert(`"${shoeData.name || shoeData.model}" is already in the list!`);
       return;
     }
-
     if (compareList.length >= 5) {
       alert("Max 5 shoes in comparison list!");
       return;
@@ -241,7 +251,7 @@ export default function ShoeDetail() {
           <div className="flex flex-col md:flex-row">
             <div className="md:w-1/2 p-8 flex items-center justify-center bg-gray-100">
               <img
-                src={shoeData.mainImage || shoeData.img_url || "https://via.placeholder.com/500"} // Backup image check
+                src={shoeData.mainImage || shoeData.img_url || "https://via.placeholder.com/500"} 
                 alt={shoeData.model}
                 className="max-w-full h-auto transform hover:scale-105 transition-transform duration-300"
               />
@@ -270,7 +280,7 @@ export default function ShoeDetail() {
                 </div>
                 <button 
                   onClick={handleAddCompare} 
-                  className="bg-[#0a0a5c] text-white px-8 py-3 rounded-full font-bold hover:bg-blue-900 transition-colors cursor-pointer"
+                  className="bg-[#0a0a5c] text-white px-8 py-3 rounded-full font-bold hover:bg-blue-900 transition-colors"
                 >
                   Compare
                 </button>
@@ -311,7 +321,7 @@ export default function ShoeDetail() {
               value={newReview.text}
               onChange={(e) => setNewReview({ ...newReview, text: e.target.value })}
             ></textarea>
-            <button type="submit" className="absolute right-6 text-gray-500 hover:text-blue-600 text-2xl cursor-pointer"><FaPlus /></button>
+            <button type="submit" className="absolute right-6 text-gray-500 hover:text-blue-600 text-2xl"><FaPlus /></button>
           </form>
 
           <div className="mt-8 space-y-6">
