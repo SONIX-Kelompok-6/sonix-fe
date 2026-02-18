@@ -24,8 +24,7 @@ const capitalizeFirst = (str) => {
 export default function Recommendation() {
   const navigate = useNavigate();
 
-  // --- 2. AMBIL DATA DARI CONTEXT ---
-  // allShoes sudah berisi data lengkap yang di-load saat login
+  // --- AMBIL DATA DARI CONTEXT (GUDANG DATA) ---
   const { allShoes, isLoading: isContextLoading } = useShoes();
 
   const [step, setStep] = useState("menu"); 
@@ -39,7 +38,7 @@ export default function Recommendation() {
   const [favoriteIds, setFavoriteIds] = useState([]); 
   const [realtimeRecs, setRealtimeRecs] = useState([]);
 
-  // STATES INPUT (SAMA SEPERTI SEBELUMNYA)
+  // STATES INPUT
   const [commonData, setCommonData] = useState({ footWidth: null, archType: null, orthotics: null });
   const [roadData, setRoadData] = useState({ purpose: null, pace: null, cushion: null, season: null, stability: null, strike: null });
   const [trailData, setTrailData] = useState({ terrain: null, pace: null, season: null, strike: null, waterResistant: null, rockSensitivity: null });
@@ -47,7 +46,7 @@ export default function Recommendation() {
   const [sortBy, setSortBy] = useState("recommended");
 
   // ==============================================
-  // 1. HYBRID FEED TRIGGER (Saat Masuk Pertama Kali)
+  // 1. HYBRID FEED TRIGGER (UPDATED: Hydration Support)
   // ==============================================
   useEffect(() => {
     const token = localStorage.getItem("userToken");
@@ -57,24 +56,33 @@ export default function Recommendation() {
       setError("Please login to use the Recommendation feature.");
     } else {
       setError(null);
-      if (userId) {
+      if (userId && allShoes.length > 0) { // Pastikan allShoes siap
         const fetchFeed = async () => {
           try {
-            // Kita biarkan feed mengambil dari API SonixMl, 
-            // tapi jika SonixMl hanya mengembalikan ID, kita bisa mapping ke Context juga.
-            // Asumsi: getUserFeed mengembalikan object sepatu lengkap.
+            // Ambil Feed (Bisa berupa object lengkap ATAU cuma ID)
             const feed = await getUserFeed(userId);
+            
             if (feed && feed.length > 0) {
-              setSearchResults(feed);
+               // 🔥 HYDRATION LOGIC: Convert ID/Partial Data -> Full Data dari Context
+               const hydratedFeed = feed.map(item => {
+                  const targetId = typeof item === 'object' ? (item.id || item.shoe_id) : item;
+                  return allShoes.find(s => 
+                      String(s.shoe_id) === String(targetId) || 
+                      String(s.slug) === String(targetId) ||
+                      String(s.id) === String(targetId)
+                  );
+               }).filter(Boolean); // Hapus yang undefined
+
+               setSearchResults(hydratedFeed.length > 0 ? hydratedFeed : feed);
             }
           } catch (err) { console.error("Feed error:", err); }
         };
         fetchFeed();
       }
     }
-  }, []);
+  }, [allShoes.length]); // Re-run kalau context loaded
 
-  // --- FETCH FAVORITES (Tetap ke API untuk data paling fresh user ini) ---
+  // --- FETCH FAVORITES ---
   useEffect(() => {
     const fetchUserFavorites = async () => {
       const token = localStorage.getItem("userToken");
@@ -121,13 +129,11 @@ export default function Recommendation() {
     } catch (err) { setError("Failed to load profile."); } finally { setProfileLoading(false); }
   };
 
-  // --- 3. HANDLE FIND (INTEGRASI CONTEXT - SPEED BOOST 🚀) ---
-// --- 3. HANDLE FIND (PERBAIKAN: Handle Struktur Data ML) ---
+  // --- 3. HANDLE FIND (UPDATED: Handle IDs Only Response) ---
   const handleFind = async () => {
     const userId = localStorage.getItem("userId");
     if (!userId) { setError("User ID not found. Please re-login."); return; }
     
-    // Safety check: Pastikan data context sudah siap
     if (isContextLoading || !allShoes || allShoes.length === 0) {
         setError("Database is still loading... please wait a moment.");
         return;
@@ -162,17 +168,15 @@ export default function Recommendation() {
     };
 
     try {
-      // 1. Minta Rekomendasi ke AI
+      // 1. Minta Rekomendasi ke AI (Sekarang response lebih ringan, misal cuma ID)
       const response = await getRecommendations(type, payload);
       console.log("🔍 ML Raw Response:", response);
 
-      // --- PERBAIKAN UTAMA DISINI ---
-      // Cek apakah response punya properti 'data' (seperti error log kamu) atau array langsung
       let mlList = [];
       if (response && response.data && Array.isArray(response.data)) {
-          mlList = response.data; // Case: { status: "success", data: [...] }
+          mlList = response.data; 
       } else if (Array.isArray(response)) {
-          mlList = response;      // Case: [...]
+          mlList = response;      
       }
 
       console.log("📋 Extracted List:", mlList);
@@ -184,20 +188,22 @@ export default function Recommendation() {
         return;
       }
 
-      // 2. MAPPING KE DATA CONTEXT
+      // 🔥 2. HYDRATION: GABUNGKAN ID DENGAN DATA CONTEXT (SPEED BOOST) 🔥
       const hydratedResults = mlList.map(mlItem => {
-          // Ambil ID dari item ML
-          const targetId = String(mlItem.id || mlItem.shoe_id);
+          // MODIFIKASI: Handle jika mlItem adalah STRING (ID langsung) atau OBJECT
+          const targetId = typeof mlItem === 'object' ? (mlItem.id || mlItem.shoe_id) : mlItem;
           
           // Cari di database local (allShoes)
-          // Kita cek kecocokan dengan id ATAU shoe_id (jaga-jaga beda nama field)
+          // Cek string equality biar aman
           const foundShoe = allShoes.find(s => 
-              String(s.id) === targetId || String(s.shoe_id) === targetId
+              String(s.shoe_id) === String(targetId) || 
+              String(s.slug) === String(targetId) ||
+              String(s.id) === String(targetId)
           );
           
-          if (!foundShoe) console.warn(`⚠️ Sepatu ID ${targetId} dari ML tidak ditemukan di Database Context.`);
+          if (!foundShoe) console.warn(`⚠️ Shoe ID ${targetId} not found in Context.`);
           return foundShoe;
-      }).filter(item => item !== undefined); // Hapus yang tidak ketemu
+      }).filter(item => item !== undefined);
 
       console.log("✅ Final Results:", hydratedResults);
 
@@ -217,10 +223,7 @@ export default function Recommendation() {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId");
     
-    if (!token) { 
-        setError("Please login to save favorites."); 
-        return; 
-    }
+    if (!token) { setError("Please login to save favorites."); return; }
 
     const idString = String(shoeId);
     const isCurrentlyFavorite = favoriteIds.includes(idString);
@@ -240,25 +243,12 @@ export default function Recommendation() {
       );
       
       if (userId) {
-        try {
-            const feedbackRecs = await sendInteraction(userId, idString, 'like', interactionValue);
-            
-            // Integrasi Realtime Recs dengan Context juga jika perlu detail
-            // Biasanya feedbackRecs sudah object lengkap dari backend ML, jadi aman.
-            if (feedbackRecs && feedbackRecs.length > 0) {
-                setRealtimeRecs(feedbackRecs);
-            }
-        } catch (mlErr) {
-            console.warn("[ML] Failed to send interaction.", mlErr);
-        }
+        sendInteraction(userId, idString, 'like', interactionValue).catch(console.warn);
       }
-
     } catch (err) {
       console.error("Failed to toggle favorite:", err);
       setFavoriteIds((prevIds) => 
-          isCurrentlyFavorite 
-          ? [...prevIds, idString] 
-          : prevIds.filter(id => id !== idString)
+          isCurrentlyFavorite ? [...prevIds, idString] : prevIds.filter(id => id !== idString)
       );
       setError("Failed to sync with server.");
     }
@@ -349,7 +339,6 @@ export default function Recommendation() {
           </div>
         )}
 
-        {/* Tampilkan indikator loading jika database sepatu sedang di-fetch di background context */}
         {isContextLoading && (
             <div className="mb-4 px-4 py-2 bg-blue-50 text-blue-800 rounded-full text-xs font-bold animate-pulse">
                 Preparing database...
@@ -361,7 +350,6 @@ export default function Recommendation() {
         </h2>
 
         <div className="flex flex-col md:flex-row gap-6 w-full px-2">
-          
           {/* --- ROAD RUNNING CARD --- */}
           <div 
             onClick={() => { if(!error && !isContextLoading) { setStep("road"); setShowMore(false); } }} 
@@ -389,13 +377,12 @@ export default function Recommendation() {
               <span className="text-white text-4xl md:text-5xl font-bold tracking-[0.25em] uppercase drop-shadow-lg text-center px-4">TRAIL</span>
             </div>
           </div>
-
         </div>
       </div>
     );
   }
 
-  // --- RENDER RESULT PAGE (SAMA SEPERTI SEBELUMNYA) ---
+  // --- RENDER RESULT PAGE ---
   if (step === "results") {
       return (
         <div className="min-h-screen bg-gray-50 p-6 font-sans">
@@ -436,8 +423,8 @@ export default function Recommendation() {
                                <span className="text-xl font-bold text-gray-800">{featuredShoe.rating ? featuredShoe.rating.toFixed(1) : "0.0"}</span>
                            </div>
                            <button 
-                                onClick={() => navigate(`/shoe/${featuredShoe.slug || featuredShoe.id}`)}
-                                className="bg-[#000080] text-white px-8 py-3 rounded-lg font-bold text-lg hover:bg-blue-900 transition-colors shadow-lg"
+                               onClick={() => navigate(`/shoe/${featuredShoe.slug || featuredShoe.id}`)}
+                               className="bg-[#000080] text-white px-8 py-3 rounded-lg font-bold text-lg hover:bg-blue-900 transition-colors shadow-lg"
                            >
                                Learn More
                            </button>
@@ -539,7 +526,7 @@ export default function Recommendation() {
                                            )}
                                        </button>
                                        <button 
-                                            onClick={() => navigate(`/shoes/${shoe.shoe_id || shoe.id}`)}
+                                            onClick={() => navigate(`/shoe/${shoe.slug || shoe.shoe_id || shoe.id}`)}
                                             className="bg-[#000080] text-white text-xs font-bold px-5 py-2.5 rounded-lg hover:bg-blue-900 transition-colors whitespace-nowrap"
                                        >
                                             Learn More

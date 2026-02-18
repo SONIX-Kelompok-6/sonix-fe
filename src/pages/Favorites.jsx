@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { sendInteraction } from "../services/SonixMl";
 import api from "../api/axios";
@@ -7,7 +6,7 @@ import { useShoes } from "../context/ShoeContext";
 export default function Favorites() {
   const { allShoes, updateShoeState } = useShoes();
   
-  // Filter Client-Side (Ini sumber kebenaran kita)
+  // Filter langsung dari Context (Ratingnya udah ada dari backend!)
   const favorites = allShoes.filter(shoe => shoe.isFavorite === true);
 
   const handleRemoveFavorite = async (e, shoeId) => {
@@ -17,15 +16,13 @@ export default function Favorites() {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId");
 
-    // 1. UPDATE STATE GLOBAL DULU (OPTIMISTIC)
-    // Jangan reload window di sini, cukup update state
+    // Optimistic Update
     const updatedList = allShoes.map(shoe => 
         shoe.shoe_id === shoeId ? { ...shoe, isFavorite: false } : shoe
     );
     updateShoeState(updatedList); 
 
     try {
-      // 2. Call API (Background)
       await api.post(
         "/api/favorites/toggle/",
         { shoe_id: String(shoeId) },
@@ -35,17 +32,10 @@ export default function Favorites() {
       if (userId) {
           sendInteraction(userId, shoeId, 'like', 0).catch(console.warn);
       }
-
     } catch (err) {
       console.error("Failed to remove favorite:", err);
-      // Kalau API Error, baru kita kasih tau user dan balikin datanya
       alert("Failed to remove favorite. Please check your connection.");
-      
-      // Rollback: Balikin status isFavorite jadi true lagi
-      const rollbackList = allShoes.map(shoe => 
-        shoe.shoe_id === shoeId ? { ...shoe, isFavorite: true } : shoe
-      );
-      updateShoeState(rollbackList);
+      window.location.reload(); 
     }
   };
 
@@ -69,10 +59,7 @@ export default function Favorites() {
              <div className="text-5xl mb-4 grayscale opacity-50">💔</div>
              <h2 className="text-xl font-bold text-gray-700">Your Favorites List is Empty</h2>
              <p className="text-gray-500 mb-6 mt-2">Looks like you haven't saved any shoes yet.</p>
-             <Link 
-               to="/search" 
-               className="px-6 py-3 bg-blue-900 text-white font-bold rounded-lg hover:bg-blue-800 transition-colors shadow-lg inline-block"
-             >
+             <Link to="/search" className="px-6 py-3 bg-blue-900 text-white font-bold rounded-lg hover:bg-blue-800 transition-colors shadow-lg inline-block">
                Find Shoes Now
              </Link>
            </div>
@@ -82,15 +69,12 @@ export default function Favorites() {
       {favorites.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {favorites.map((shoe) => {
-            // FIX RATING DISPLAY: Paksa jadi Number dan cek > 0
+            // Rating otomatis ada, tinggal format
             const ratingVal = Number(shoe.rating || 0); 
             const hasRating = ratingVal > 0;
 
             return (
-              <div 
-                key={shoe.shoe_id} 
-                className="group relative bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col"
-              >
+              <div key={shoe.shoe_id} className="group relative bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col">
                 <button 
                   onClick={(e) => handleRemoveFavorite(e, shoe.shoe_id)}
                   className="absolute top-3 right-3 p-2.5 bg-white/90 backdrop-blur-sm rounded-full shadow-md text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all z-20 cursor-pointer"
@@ -103,19 +87,11 @@ export default function Favorites() {
 
                 <Link to={`/shoe/${shoe.slug}`} className="flex flex-col flex-grow h-full">
                   <div className="h-56 bg-gray-50 p-6 flex justify-center items-center relative overflow-hidden">
-                    <img 
-                      src={shoe.img_url || shoe.image_url || "https://via.placeholder.com/300x200?text=No+Image"} 
-                      alt={shoe.name} 
-                      className="max-h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-500"
-                    />
+                    <img src={shoe.img_url || shoe.image_url || "https://via.placeholder.com/300x200?text=No+Image"} alt={shoe.name} className="max-h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-500" />
                   </div>
-                  
                   <div className="p-5 flex flex-col flex-grow bg-white">
                     <p className="text-xs text-blue-600 font-bold uppercase tracking-widest mb-1">{shoe.brand || "Brand"}</p>
-                    <h3 className="font-bold text-gray-800 text-base mb-2 line-clamp-2 leading-snug group-hover:text-blue-700 transition-colors">
-                      {shoe.name}
-                    </h3>
-                    
+                    <h3 className="font-bold text-gray-800 text-base mb-2 line-clamp-2 leading-snug group-hover:text-blue-700 transition-colors">{shoe.name}</h3>
                     <div className="mt-auto flex items-center gap-1 text-sm font-medium text-gray-500">
                         <svg className={`w-4 h-4 fill-current ${hasRating ? 'text-yellow-400' : 'text-gray-300'}`} viewBox="0 0 24 24">
                           <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
