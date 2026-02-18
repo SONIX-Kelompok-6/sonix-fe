@@ -237,6 +237,9 @@ export default function ShoeDetail() {
     alert(`Successfully added "${shoeToSave.name}" to comparison!`);
   };
 
+  const isTrail = String(shoeData.shoe_id).toUpperCase().startsWith('T');
+  const isRoad = !isTrail;
+
   if (isLoading) return <div className="flex h-screen items-center justify-center text-white bg-[#4a76a8]">Loading...</div>;
   if (error) return <div className="flex h-screen items-center justify-center text-white bg-[#4a76a8]">{error}</div>;
   if (!shoeData) return <div className="flex h-screen items-center justify-center text-white bg-[#4a76a8]">Shoe not found.</div>;
@@ -244,7 +247,7 @@ export default function ShoeDetail() {
   return (
     <div className="min-h-screen bg-[#4a76a8]">
       <Navbar />
-      <div className="container mx-auto px-4 pt-24 pb-12">
+      <div className="container mx-auto px-14 pt-35 pb-2">
         
         {/* 🔥 TOMBOL BACK YANG BISA BALIK KE PAGE SEBELUMNYA (DINAMIS) 🔥 */}
         <button 
@@ -269,8 +272,8 @@ export default function ShoeDetail() {
 
             <div className="md:w-1/2 p-8 flex flex-col justify-center bg-[#e9eef5]">
               <h3 className="text-xl font-semibold text-gray-700">{shoeData.brand.toUpperCase()}</h3>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">{shoeData.name}</h1>
-              <p className="text-lg text-gray-600 mb-4">Weight : {shoeData.weight_lab_oz || "-"} oz</p>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">{shoeData.name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</h1>
+              <p className="text-lg text-gray-600 mb-4">Terrain : {isTrail ? "Trail" : "Road"}</p>
               <p className="text-gray-700 mb-6 leading-relaxed">{shoeData.description}</p>
 
               <div className="flex items-center justify-between mb-6">
@@ -307,8 +310,6 @@ export default function ShoeDetail() {
 
           <div className="bg-white rounded-3xl p-8 shadow-2xl border border-gray-100">
             {(() => {
-              const isTrail = String(shoeData.shoe_id).toUpperCase().startsWith('T');
-              const isRoad = !isTrail;
 
               const renderPace = () => {
                 let p = [];
@@ -370,12 +371,12 @@ export default function ShoeDetail() {
                       <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Plate</p>
                       <p className="text-gray-800 font-bold">{shoeData.plate ? "✅" : "❌"}</p>
                     </div>
-                    <div>
-                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Strike Pattern</p>
-                      <p className="text-gray-800 font-bold">
-                        {shoeData.strike_heel ? "Heel" : shoeData.strike_mid ? "Midfoot" : shoeData.strike_forefoot ? "Forefoot" : "-"}
-                      </p>
-                    </div>
+                    {isTrail && (
+                      <div>
+                        <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Strike Pattern</p>
+                        <p className="text-gray-800 font-bold">{shoeData.strike_pattern || "-"}</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* KOLOM 2 */}
@@ -541,6 +542,12 @@ export default function ShoeDetail() {
                           <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Waterproof</p>
                           <p className="text-gray-800 font-bold text-sm">{renderWaterproof()}</p>
                         </div>
+                      </div>
+                    )}
+                    {isRoad && (
+                      <div>
+                        <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Strike Pattern</p>
+                        <p className="text-gray-800 font-bold">{shoeData.strike_pattern || "-"}</p>
                       </div>
                     )}
                   </div>
