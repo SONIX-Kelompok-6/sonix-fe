@@ -49,7 +49,7 @@ export default function Favorites() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-6 pb-12 pt-8 min-h-screen font-sans">
+    <div className="max-w-6xl mx-auto px-6 pb-12 pt-30 min-h-screen font-sans">
       
       {/* HEADER */}
       <div className="mb-8 border-b pb-4 flex justify-between items-end">

@@ -33,12 +33,22 @@ export default function App() {
 
   const hideFooterRoutes = [
     "/recommendation",
-    "/shoes-detail",
+    "/shoe",
+  ];
+
+  const hideNavbarRoutes = [
+    "/recommendation",
+    "/shoe",
   ];
 
   // Cek apakah lokasi saat ini ada di dalam daftar di atas
   const shouldHideNavbarFooter = hideNavbarFooterRoutes.includes(location.pathname);
-  const shouldHideFooter = hideFooterRoutes.includes(location.pathname);
+  const shouldHideFooter = hideFooterRoutes.some(path => 
+    location.pathname.startsWith(path)
+  );
+  const shouldHideNavbar = hideNavbarRoutes.some(path => 
+    location.pathname.startsWith(path)
+  );
 
   // Logic lama untuk padding (tetap dipertahankan, tapi disesuaikan sedikit)
   const isCustomLayoutPage = location.pathname === "/";
@@ -47,10 +57,10 @@ export default function App() {
     <div className="font-sans text-gray-900 bg-white min-h-screen flex flex-col">
       
       {/* 2. PERUBAHAN: Render Navbar HANYA jika shouldHideNavbarFooter bernilai false */}
-      {!shouldHideNavbarFooter && <Navbar />}
+      {(!shouldHideNavbarFooter && !shouldHideNavbar) && <Navbar />}
 
       {/* Main Content*/}
-      <main className={`flex-grow ${isCustomLayoutPage || shouldHideNavbarFooter ? "pt-0" : "pt-24"}`}>
+      <main className={`flex-grow ${isCustomLayoutPage || shouldHideNavbarFooter ? "pt-0" : "pt-0"}`}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
