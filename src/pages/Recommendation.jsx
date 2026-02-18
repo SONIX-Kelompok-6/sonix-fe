@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import api from "../api/axios"; 
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { getRecommendations, sendInteraction, getUserFeed } from "../services/SonixMl";
 import { useShoes } from "../context/ShoeContext"; 
 
-// --- IMPORT ASSETS (TETAP SAMA) ---
+// --- IMPORT ASSETS ---
 import roadImg from "../assets/recommendation-page/road.png";
 import trailImg from "../assets/recommendation-page/trail.png";
 import imgNarrow from '../assets/profile-images/foot-narrow.svg';
@@ -44,6 +44,9 @@ export default function Recommendation() {
   const [authError, setAuthError] = useState(null);
   const [error, setError] = useState(null);
   const [notification, setNotification] = useState(null);
+  
+  // State baru untuk Mobile Filter Toggle
+  const [showMobileFilter, setShowMobileFilter] = useState(false);
 
   const [searchResults, setSearchResults] = useState([]); 
   const [favoriteIds, setFavoriteIds] = useState([]); 
@@ -69,7 +72,7 @@ export default function Recommendation() {
     setNotification(message);
   };
 
-  // 🔥 1. RESTORE STATE SAAT PAGE MOUNT (Setiap kali halaman dibuka)
+  // RESTORE STATE
   useEffect(() => {
     try {
       const savedState = sessionStorage.getItem("rush_rec_state");
@@ -79,8 +82,6 @@ export default function Recommendation() {
         setRoadData(parsed.roadData);
         setTrailData(parsed.trailData);
         setSearchResults(parsed.results || []);
-        
-        // Restore Step terakhir user
         if (parsed.step) {
             setStep(parsed.step);
         }
@@ -88,10 +89,8 @@ export default function Recommendation() {
     } catch (e) {
       console.warn("Gagal restore state", e);
     }
-    // HAPUS CLEANUP FUNCTION DISINI. BIARKAN DATA PERSISTENT.
   }, []);
 
-  // --- HELPER SAVE STATE ---
   const saveStateToStorage = (currentStep, results = searchResults) => {
     const stateToSave = {
         step: currentStep,
@@ -103,13 +102,12 @@ export default function Recommendation() {
     sessionStorage.setItem("rush_rec_state", JSON.stringify(stateToSave));
   };
 
-  // 🔥 HANDLER NAVIGASI (Sederhana saja)
   const goToDetail = (slug) => {
       if (!slug) return;
       navigate(`/shoe/${slug}`);
   };
 
-  // --- CEK LOGIN & FETCH FEED ---
+  // CEK LOGIN & FEED
   useEffect(() => {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId");
@@ -139,7 +137,7 @@ export default function Recommendation() {
     }
   }, [allShoes.length]);
 
-  // --- FETCH FAVORITES ---
+  // FETCH FAVORITES
   useEffect(() => {
     const fetchUserFavorites = async () => {
       const token = localStorage.getItem("userToken");
@@ -206,7 +204,7 @@ export default function Recommendation() {
     return hydratedResults;
   };
 
-  // --- AUTO PREFETCH & AUTO SAVE ---
+  // AUTO PREFETCH & SAVE
   useEffect(() => {
     const valid = isFormValid();
     if (valid && !prefetchRef.current && !loading && !error && !isContextLoading && !authError) {
@@ -215,9 +213,8 @@ export default function Recommendation() {
            return null;
        });
     }
-    // 🔥 Simpan state ke storage tiap kali input berubah (Persistent)
     if (step !== 'menu') {
-        saveStateToStorage(step, searchResults); // Pass current results too
+        saveStateToStorage(step, searchResults);
     }
   }, [commonData, roadData, trailData, step, authError, searchResults]); 
 
@@ -240,10 +237,7 @@ export default function Recommendation() {
       setSearchResults(finalResults);
       setError(null);
       setStep("results");
-      
-      // 🔥 Simpan hasil ke storage
       saveStateToStorage("results", finalResults);
-
     } catch (err) {
       setError("AI Engine is busy. Please try again.");
       prefetchRef.current = null;
@@ -368,9 +362,9 @@ export default function Recommendation() {
   // --- RENDER MENU ---
   if (step === "menu") {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center pt-30" style={gridStyle}>
+      <div className="min-h-screen flex flex-col items-center justify-center pt-24 md:pt-30" style={gridStyle}>
         <Navbar />
-        <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl w-[90%] max-w-4xl p-8 border border-gray-100 flex flex-col items-center transition-all duration-500">
+        <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl w-[90%] max-w-4xl p-6 md:p-8 border border-gray-100 flex flex-col items-center transition-all duration-500">
           
           {authError && (
             <div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2">
@@ -389,33 +383,36 @@ export default function Recommendation() {
           <h2 className="text-center font-bold tracking-[0.1em] mb-8 text-gray-800 text-xl uppercase">Types of Running</h2>
           
           <div className={`flex flex-col md:flex-row gap-6 w-full px-2 transition-all duration-300 ${authError ? 'opacity-50 grayscale pointer-events-none select-none' : ''}`}>
+            {/* BUTTON ROAD */}
             <div 
                 onClick={() => { 
                     if(!authError && !error && !isContextLoading) { 
-                        // 🔥 RESET STORAGE SAAT MULAI BARU
                         sessionStorage.removeItem("rush_rec_state");
                         setStep("road"); 
                         setShowMore(false); 
                     } 
                 }} 
-                className={`relative flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-64 ${(error || isContextLoading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`}>
+                // PERBAIKAN DISINI: Ganti flex-1 dengan w-full md:flex-1 agar tidak collapse di mobile
+                className={`relative w-full md:flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-48 md:h-64 ${(error || isContextLoading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`}>
               <img src={roadImg} alt="Road" className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out ${(!error && !isContextLoading) && 'group-hover:scale-110'}`} />
               <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors duration-300"></div>
-              <div className="absolute inset-0 flex items-center justify-center z-10"><span className="text-white text-4xl md:text-5xl font-bold tracking-[0.25em] uppercase drop-shadow-lg text-center px-4">ROAD</span></div>
+              <div className="absolute inset-0 flex items-center justify-center z-10"><span className="text-white text-3xl md:text-5xl font-bold tracking-[0.25em] uppercase drop-shadow-lg text-center px-4">ROAD</span></div>
             </div>
+
+            {/* BUTTON TRAIL */}
             <div 
                 onClick={() => { 
                     if(!authError && !error && !isContextLoading) { 
-                        // 🔥 RESET STORAGE SAAT MULAI BARU
                         sessionStorage.removeItem("rush_rec_state");
                         setStep("trail"); 
                         setShowMore(false); 
                     } 
                 }} 
-                className={`relative flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-64 ${(error || isContextLoading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`}>
+                // PERBAIKAN DISINI: Ganti flex-1 dengan w-full md:flex-1
+                className={`relative w-full md:flex-1 rounded-[2rem] overflow-hidden group shadow-lg transition-all duration-300 h-48 md:h-64 ${(error || isContextLoading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl hover:-translate-y-1'}`}>
               <img src={trailImg} alt="Trail" className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out ${(!error && !isContextLoading) && 'group-hover:scale-110'}`} />
               <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors duration-300"></div>
-              <div className="absolute inset-0 flex items-center justify-center z-10"><span className="text-white text-4xl md:text-5xl font-bold tracking-[0.25em] uppercase drop-shadow-lg text-center px-4">TRAIL</span></div>
+              <div className="absolute inset-0 flex items-center justify-center z-10"><span className="text-white text-3xl md:text-5xl font-bold tracking-[0.25em] uppercase drop-shadow-lg text-center px-4">TRAIL</span></div>
             </div>
           </div>
         </div>
@@ -427,32 +424,33 @@ export default function Recommendation() {
   // --- RENDER RESULT PAGE ---
   if (step === "results") {
       return (
-        <div className="min-h-screen p-6 pt-30 font-sans" style={gridStyle}>
+        <div className="min-h-screen p-4 md:p-6 pt-24 md:pt-30 font-sans" style={gridStyle}>
           <Navbar />
            <div className="max-w-6xl mx-auto">
                <div className="flex flex-col gap-4 mb-6">
                  <div className="flex items-center gap-4">
                    <button onClick={() => setStep(roadData.purpose ? "road" : "trail")} className="text-sm font-bold text-gray-400 hover:text-blue-600 bg-white/50 px-3 py-1 rounded-full">← BACK</button>
-                   <h1 className="text-2xl font-serif font-bold text-gray-800">Recommended for you :</h1>
+                   <h1 className="text-xl md:text-2xl font-serif font-bold text-gray-800">Recommended for you :</h1>
                  </div>
                </div>
                
+               {/* --- FEATURED SHOE --- */}
                {featuredShoe ? (
                    <div 
                       onClick={() => goToDetail(featuredShoe.slug || featuredShoe.id)}
-                      className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-sm p-8 mb-10 flex flex-col md:flex-row items-center gap-8 border border-gray-100 relative overflow-hidden cursor-pointer group"
+                      className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-sm p-4 md:p-8 mb-6 md:mb-10 flex flex-col md:flex-row items-center gap-6 md:gap-8 border border-gray-100 relative overflow-hidden cursor-pointer group"
                    >
-                       <div className="absolute top-0 left-0 bg-yellow-400 text-yellow-900 text-xs font-bold px-4 py-1 rounded-br-xl shadow-sm z-20">TOP MATCH</div>
-                       <div className="w-full md:w-1/2 flex justify-center bg-blue-50 rounded-xl p-6 relative">
-                           <img src={featuredShoe.img || featuredShoe.img_url} alt={featuredShoe.name} className="w-[80%] object-contain drop-shadow-xl z-10 hover:scale-110 transition-transform duration-500" />
+                       <div className="absolute top-0 left-0 bg-yellow-400 text-yellow-900 text-[10px] md:text-xs font-bold px-4 py-1 rounded-br-xl shadow-sm z-20">TOP MATCH</div>
+                       <div className="w-full md:w-1/2 flex justify-center bg-blue-50 rounded-xl p-4 md:p-6 relative">
+                           <img src={featuredShoe.img || featuredShoe.img_url} alt={featuredShoe.name} className="w-[70%] md:w-[80%] object-contain drop-shadow-xl z-10 hover:scale-110 transition-transform duration-500" />
                        </div>
-                       <div className="w-full md:w-1/2 space-y-4">
+                       <div className="w-full md:w-1/2 space-y-3 md:space-y-4 text-center md:text-left">
                            <div className="flex justify-between items-start">
-                               <div>
-                                   <p className="text-gray-500 text-sm font-bold uppercase tracking-wider mb-1">{featuredShoe.brand}</p>
-                                   <h2 className="text-4xl font-serif font-bold text-gray-900 leading-tight group-hover:text-blue-900 transition-colors">{featuredShoe.name}</h2>
+                               <div className="w-full md:w-auto">
+                                   <p className="text-gray-500 text-xs md:text-sm font-bold uppercase tracking-wider mb-1">{featuredShoe.brand}</p>
+                                   <h2 className="text-2xl md:text-4xl font-serif font-bold text-gray-900 leading-tight group-hover:text-blue-900 transition-colors">{featuredShoe.name}</h2>
                                </div>
-                               <button onClick={(e) => { e.stopPropagation(); handleAddFavorite(String(featuredShoe.shoe_id || featuredShoe.id)); }} className="transition-transform active:scale-90 cursor-pointer p-2 rounded-full hover:bg-gray-100">
+                               <button onClick={(e) => { e.stopPropagation(); handleAddFavorite(String(featuredShoe.shoe_id || featuredShoe.id)); }} className="transition-transform active:scale-90 cursor-pointer p-2 rounded-full hover:bg-gray-100 hidden md:block">
                                    {favoriteIds.includes(String(featuredShoe.shoe_id || featuredShoe.id)) ? (
                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10 text-red-500"><path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" /></svg>
                                    ) : (
@@ -460,19 +458,35 @@ export default function Recommendation() {
                                    )}
                                </button>
                            </div>
-                           <p className="text-xl text-gray-700">Weight : {featuredShoe.weight_lab_oz}oz</p>
-                           <div className="flex items-center gap-2 mb-4">
+                           <p className="text-lg md:text-xl text-gray-700">Weight : {featuredShoe.weight_lab_oz}oz</p>
+                           <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
                                <svg className="w-6 h-6 text-gray-800 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                                <span className="text-xl font-bold text-gray-800">{featuredShoe.rating ? featuredShoe.rating.toFixed(1) : "0.0"}</span>
                            </div>
-                           <button onClick={(e) => {e.stopPropagation(); goToDetail(featuredShoe.slug || featuredShoe.id)}} className="bg-[#000080] text-white px-8 py-3 rounded-lg font-bold text-lg hover:bg-blue-900 transition-colors shadow-lg cursor-pointer">Learn More</button>
+                           <button onClick={(e) => {e.stopPropagation(); goToDetail(featuredShoe.slug || featuredShoe.id)}} className="w-full md:w-auto bg-[#000080] text-white px-8 py-3 rounded-lg font-bold text-lg hover:bg-blue-900 transition-colors shadow-lg cursor-pointer">Learn More</button>
                        </div>
                    </div>
                ) : (<div className="text-center py-20 text-gray-500 bg-white/80 rounded-2xl mb-10 shadow-sm border border-gray-100"><p className="text-lg">No recommendations found yet.</p><p className="text-sm">Try adjusting your filters or search again.</p></div>)}
 
-               <div className="flex flex-col md:flex-row gap-8">
-                   <div className="w-full md:w-1/4">
-                       <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 sticky top-4 max-h-[85vh] flex flex-col shadow-sm border border-gray-100">
+               {/* --- CONTENT AREA (FILTER + LIST) --- */}
+               <div className="flex flex-col md:flex-row gap-6 md:gap-8">
+                   
+                   {/* MOBILE FILTER BUTTON TOGGLE */}
+                   <div className="md:hidden">
+                        <button 
+                            onClick={() => setShowMobileFilter(!showMobileFilter)}
+                            className="w-full bg-white border border-gray-300 py-3 rounded-xl font-bold text-gray-700 shadow-sm flex items-center justify-center gap-2"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+                            </svg>
+                            {showMobileFilter ? 'Hide Filters' : 'Show Brand Filters'}
+                        </button>
+                   </div>
+
+                   {/* --- SIDEBAR FILTER (Responsif) --- */}
+                   <div className={`w-full md:w-1/4 ${showMobileFilter ? 'block' : 'hidden'} md:block`}>
+                       <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 sticky top-24 max-h-[60vh] md:max-h-[85vh] flex flex-col shadow-sm border border-gray-100 z-10">
                            <div className="shrink-0">
                                <h3 className="text-lg font-bold text-gray-800 mb-4">Brand :</h3>
                                {selectedBrands.length > 0 && (
@@ -502,8 +516,9 @@ export default function Recommendation() {
                        </div>
                    </div>
 
+                   {/* --- LIST SHOES --- */}
                    <div className="w-full md:w-3/4 space-y-4">
-                       <div className="flex justify-between items-center mb-2">
+                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 gap-2">
                            <h3 className="font-serif font-bold text-xl text-gray-800">Best Shoes For You :</h3>
                            <div className="flex items-center gap-2">
                                <span className="text-sm text-gray-600">Sort by:</span>
@@ -517,18 +532,18 @@ export default function Recommendation() {
                        {filteredListShoes.length > 0 ? (
                            filteredListShoes.map((shoe) => (
                                <div 
-                                  key={shoe.id || shoe.shoe_id} 
-                                  onClick={() => goToDetail(shoe.slug || shoe.shoe_id || shoe.id)}
-                                  className="bg-white/90 backdrop-blur-sm rounded-xl p-4 flex flex-col sm:flex-row items-center gap-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group cursor-pointer"
+                                 key={shoe.id || shoe.shoe_id} 
+                                 onClick={() => goToDetail(shoe.slug || shoe.shoe_id || shoe.id)}
+                                 className="bg-white/90 backdrop-blur-sm rounded-xl p-4 flex flex-col sm:flex-row items-center gap-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group cursor-pointer"
                                >
-                                   <div className="w-full sm:w-[180px] h-[120px] bg-blue-50 rounded-lg flex items-center justify-center p-2">
+                                   <div className="w-full sm:w-[180px] h-[140px] sm:h-[120px] bg-blue-50 rounded-lg flex items-center justify-center p-2">
                                        <img src={shoe.img || shoe.img_url} alt={shoe.name} className="max-w-full max-h-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform" />
                                    </div>
-                                   <div className="flex-1 w-full">
+                                   <div className="flex-1 w-full text-center sm:text-left">
                                        <p className="text-xs font-bold text-gray-500 uppercase mb-1">{shoe.brand}</p>
                                        <h4 className="font-serif font-bold text-xl text-gray-900 mb-1 group-hover:text-blue-900 transition-colors">{shoe.name}</h4>
                                        <p className="text-gray-600 text-sm mb-3">Weight : {shoe.weight_lab_oz}oz</p>
-                                       <div className="flex items-center gap-1">
+                                       <div className="flex items-center justify-center sm:justify-start gap-1">
                                            <svg className="w-4 h-4 text-gray-800 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                                            <span className="text-sm font-bold">{shoe.rating ? shoe.rating.toFixed(1) : "0.0"}</span>
                                        </div>
@@ -541,7 +556,7 @@ export default function Recommendation() {
                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" /></svg>
                                            )}
                                        </button>
-                                       <button onClick={() => { e.stopPropagation(); goToDetail(shoe.slug || shoe.shoe_id || shoe.id); }} className="bg-[#000080] text-white text-xs font-bold px-5 py-2.5 rounded-lg hover:bg-blue-900 transition-colors whitespace-nowrap cursor-pointer">Learn More</button>
+                                       <button onClick={() => { e.stopPropagation(); goToDetail(shoe.slug || shoe.shoe_id || shoe.id); }} className="bg-[#000080] text-white text-xs font-bold px-5 py-2.5 rounded-lg hover:bg-blue-900 transition-colors whitespace-nowrap cursor-pointer flex-1 sm:flex-none">Learn More</button>
                                    </div>
                                </div>
                            ))
@@ -560,13 +575,13 @@ export default function Recommendation() {
 
   // --- FORM INPUT ---
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 pt-30 font-sans animate-in fade-in duration-500" style={gridStyle}>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 pt-24 md:pt-30 font-sans animate-in fade-in duration-500" style={gridStyle}>
       <Navbar />
       <div className="bg-white/90 backdrop-blur-md rounded-xl shadow-2xl w-full max-w-md p-6 relative border border-gray-100">
         <button 
             onClick={() => {
                 setStep("menu");
-                sessionStorage.removeItem("rush_rec_state"); // Reset manual kalau back dari form
+                sessionStorage.removeItem("rush_rec_state"); 
             }} 
             className="absolute top-4 left-4 text-[10px] font-bold text-gray-400 hover:text-orange-500 bg-gray-50 px-2 py-1 rounded-full cursor-pointer"
         >
@@ -581,9 +596,9 @@ export default function Recommendation() {
         
         <div className="text-right mb-4"><button onClick={handleUseProfile} disabled={profileLoading} className="text-[12px] italic text-gray-500 hover:text-blue-600 underline disabled:opacity-50 cursor-pointer">{profileLoading ? "Loading Profile..." : "Use My Profile"}</button></div>
         
-        <div className="mb-6 text-left"><label className="block text-sm font-bold mb-3 uppercase text-gray-800">Foot Width Type <span className="text-red-500">*</span></label><div className="grid grid-cols-3 gap-3">{widthOptions.map((opt) => (<button key={opt.label} onClick={() => handleToggleSelect('footWidth', opt.value)} className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center transition-all ${commonData.footWidth === opt.value ? activeStyle : inactiveStyle}`}><img src={opt.img} alt={opt.label} className="h-10 w-auto mb-2" /><span className="text-[12px] font-bold">{opt.label}</span></button>))}</div></div>
+        <div className="mb-6 text-left"><label className="block text-sm font-bold mb-3 uppercase text-gray-800">Foot Width Type <span className="text-red-500">*</span></label><div className="grid grid-cols-3 gap-2 md:gap-3">{widthOptions.map((opt) => (<button key={opt.label} onClick={() => handleToggleSelect('footWidth', opt.value)} className={`cursor-pointer border-2 rounded-xl p-2 md:p-3 flex flex-col items-center transition-all ${commonData.footWidth === opt.value ? activeStyle : inactiveStyle}`}><img src={opt.img} alt={opt.label} className="h-8 md:h-10 w-auto mb-2" /><span className="text-[10px] md:text-[12px] font-bold">{opt.label}</span></button>))}</div></div>
         
-        <div className="mb-6 text-left"><label className="block text-sm font-bold mb-3 uppercase text-gray-800">Arch Type <span className="text-red-500">*</span></label><div className="grid grid-cols-3 gap-3">{archOptions.map((opt) => (<button key={opt.label} onClick={() => handleToggleSelect('archType', opt.value)} className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center transition-all ${commonData.archType === opt.value ? activeStyle : inactiveStyle}`}><img src={opt.img} alt={opt.label} className="h-8 w-auto mb-2" /><span className="text-[12px] font-bold leading-tight">{opt.label}</span></button>))}</div></div>
+        <div className="mb-6 text-left"><label className="block text-sm font-bold mb-3 uppercase text-gray-800">Arch Type <span className="text-red-500">*</span></label><div className="grid grid-cols-3 gap-2 md:gap-3">{archOptions.map((opt) => (<button key={opt.label} onClick={() => handleToggleSelect('archType', opt.value)} className={`cursor-pointer border-2 rounded-xl p-2 md:p-3 flex flex-col items-center transition-all ${commonData.archType === opt.value ? activeStyle : inactiveStyle}`}><img src={opt.img} alt={opt.label} className="h-6 md:h-8 w-auto mb-2" /><span className="text-[10px] md:text-[12px] font-bold leading-tight">{opt.label}</span></button>))}</div></div>
         
         <div className="mb-6 text-left"><label className="block text-sm font-bold mb-3 uppercase text-gray-800">Orthotics Usage <span className="text-red-500">*</span></label><div className="grid grid-cols-2 gap-4">{['Yes', 'No'].map(val => (<button key={val} onClick={() => handleToggleSelect('orthotics', val)} className={`cursor-pointer border-2 rounded-xl p-4 flex flex-col items-center justify-center transition-all ${commonData.orthotics === val ? activeStyle : inactiveStyle}`}><span className="text-xs font-bold text-center">{val === 'Yes' ? 'Yes, I use orthotics' : "No, I don't"}</span></button>))}</div></div>
 
@@ -603,12 +618,12 @@ export default function Recommendation() {
         
         {showMore && (
             <div className="mt-4 border-t pt-4 animate-in slide-in-from-top-2 duration-300">
-                <div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Pace Target (Optional)</label><div className="grid grid-cols-3 gap-2">{[{ l: 'Easy', t: '(6:30 min/km)' }, { l: 'Steady', t: '(5-6:30 min/km)' }, { l: 'Fast', t: '(<5:00 min/km)' }].map(p => {const currentPace = step === "road" ? roadData.pace : trailData.pace;return (<button key={p.l} onClick={() => handleToggleSelect('pace', p.l)} className={`border-2 p-1 rounded-xl transition-all ${currentPace === p.l ? activeStyle : inactiveStyle}`}><p className="text-[12px] font-bold">{p.l}</p><p className="text-[8px] font-bold opacity-80">{p.t}</p></button>);})}</div></div>
+                <div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Pace Target (Optional)</label><div className="grid grid-cols-3 gap-2">{[{ l: 'Easy', t: '(6:30 min/km)' }, { l: 'Steady', t: '(5-6:30 min/km)' }, { l: 'Fast', t: '(<5:00 min/km)' }].map(p => {const currentPace = step === "road" ? roadData.pace : trailData.pace;return (<button key={p.l} onClick={() => handleToggleSelect('pace', p.l)} className={`border-2 p-1 rounded-xl transition-all ${currentPace === p.l ? activeStyle : inactiveStyle}`}><p className="text-[10px] md:text-[12px] font-bold">{p.l}</p><p className="text-[8px] font-bold opacity-80">{p.t}</p></button>);})}</div></div>
                 {step === "road" && <SelectionGroup label="Cushion Preference (Optional)" options={['Soft', 'Balanced', 'Firm']} category="cushion" />}
                 <SelectionGroup label="Season (Optional)" options={['Summer', 'Spring & Fall', 'Winter']} category="season" />
-                {step === "road" && (<div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Stability Need (Optional)</label><div className="flex gap-2 w-2/3">{['Neutral', 'Guided'].map(s => (<button key={s} onClick={() => handleToggleSelect('stability', s)} className={`flex-1 py-2 rounded-xl text-[12px] border-2 transition-all ${roadData.stability === s ? activeStyle : inactiveStyle}`}>{s}</button>))}</div></div>)}
-                <div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Strike pattern (Optional)</label><div className="flex gap-4 text-[12px]">{['Heel', 'Mid', 'Forefoot'].map(s => {const currentStrike = step === "road" ? roadData.strike : trailData.strike;return (<button key={s} onClick={() => handleToggleSelect('strike', s)} className="flex items-center gap-2 group"><div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${currentStrike === s ? 'border-blue-600 bg-blue-50' : 'border-gray-300 group-hover:border-blue-400'}`}>{currentStrike === s && <div className="w-2 h-2 bg-blue-600 rounded-full"></div>}</div><span className={currentStrike === s ? 'text-blue-900 font-bold' : 'text-gray-700 font-bold'}>{s}</span></button>);})}</div></div>
-                {step === "trail" && (<><div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Water Resistant (Optional)</label><div className="flex gap-4 text-[12px]">{['Waterproof', 'Water Repellent'].map(w => (<button key={w} onClick={() => handleToggleSelect('waterResistant', w)} className="flex items-center gap-2 group"><div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${trailData.waterResistant === w ? 'border-blue-600 bg-blue-50' : 'border-gray-300 group-hover:border-blue-400'}`}>{trailData.waterResistant === w && <span className="text-blue-600 text-[10px]">✓</span>}</div><span className={trailData.waterResistant === w ? 'text-blue-900 font-bold' : 'text-gray-700 font-bold'}>{w}</span></button>))}</div></div><div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Rock Sensitivity (Optional)</label><div className="flex gap-4 text-[12px]">{['Yes', 'No'].map(r => (<button key={r} onClick={() => handleToggleSelect('rockSensitivity', r)} className="flex items-center gap-2 group"><div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${trailData.rockSensitivity === r ? 'border-blue-600 bg-blue-50' : 'border-gray-300 group-hover:border-blue-400'}`}>{trailData.rockSensitivity === r && <span className="text-blue-600 text-[10px]">✓</span>}</div><span className={trailData.rockSensitivity === r ? 'text-blue-900 font-bold' : 'text-gray-700 font-bold'}>{r}</span></button>))}</div></div></>)}
+                {step === "road" && (<div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Stability Need (Optional)</label><div className="flex gap-2 w-full md:w-2/3">{['Neutral', 'Guided'].map(s => (<button key={s} onClick={() => handleToggleSelect('stability', s)} className={`flex-1 py-2 rounded-xl text-[12px] border-2 transition-all ${roadData.stability === s ? activeStyle : inactiveStyle}`}>{s}</button>))}</div></div>)}
+                <div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Strike pattern (Optional)</label><div className="flex flex-wrap gap-4 text-[12px]">{['Heel', 'Mid', 'Forefoot'].map(s => {const currentStrike = step === "road" ? roadData.strike : trailData.strike;return (<button key={s} onClick={() => handleToggleSelect('strike', s)} className="flex items-center gap-2 group"><div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${currentStrike === s ? 'border-blue-600 bg-blue-50' : 'border-gray-300 group-hover:border-blue-400'}`}>{currentStrike === s && <div className="w-2 h-2 bg-blue-600 rounded-full"></div>}</div><span className={currentStrike === s ? 'text-blue-900 font-bold' : 'text-gray-700 font-bold'}>{s}</span></button>);})}</div></div>
+                {step === "trail" && (<><div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Water Resistant (Optional)</label><div className="flex flex-wrap gap-4 text-[12px]">{['Waterproof', 'Water Repellent'].map(w => (<button key={w} onClick={() => handleToggleSelect('waterResistant', w)} className="flex items-center gap-2 group"><div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${trailData.waterResistant === w ? 'border-blue-600 bg-blue-50' : 'border-gray-300 group-hover:border-blue-400'}`}>{trailData.waterResistant === w && <span className="text-blue-600 text-[10px]">✓</span>}</div><span className={trailData.waterResistant === w ? 'text-blue-900 font-bold' : 'text-gray-700 font-bold'}>{w}</span></button>))}</div></div><div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Rock Sensitivity (Optional)</label><div className="flex gap-4 text-[12px]">{['Yes', 'No'].map(r => (<button key={r} onClick={() => handleToggleSelect('rockSensitivity', r)} className="flex items-center gap-2 group"><div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${trailData.rockSensitivity === r ? 'border-blue-600 bg-blue-50' : 'border-gray-300 group-hover:border-blue-400'}`}>{trailData.rockSensitivity === r && <span className="text-blue-600 text-[10px]">✓</span>}</div><span className={trailData.rockSensitivity === r ? 'text-blue-900 font-bold' : 'text-gray-700 font-bold'}>{r}</span></button>))}</div></div></>)}
             </div>
         )}
       </div>
@@ -616,7 +631,7 @@ export default function Recommendation() {
       <button 
         disabled={!isFormValid() || error || isContextLoading} 
         onClick={handleFind} 
-        className={`mt-8 w-full max-w-md py-4 rounded-xl font-bold text-lg shadow-lg transition-all ${isFormValid() && !error && !isContextLoading ? 'bg-blue-900 text-white hover:bg-blue-800 active:scale-95 cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+        className={`mt-6 md:mt-8 w-full max-w-md py-4 rounded-xl font-bold text-lg shadow-lg transition-all ${isFormValid() && !error && !isContextLoading ? 'bg-blue-900 text-white hover:bg-blue-800 active:scale-95 cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
       >
         {loading ? 'Finding...' : isContextLoading ? 'Loading Database...' : 'Find'}
       </button>
