@@ -578,7 +578,7 @@ export default function Recommendation() {
           {step === "road" ? "User Input Road" : "User Input Trail"}
         </h1>
         
-        {error && (<div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2"><span>{error}</span><Link to="/login" className="px-4 py-1.5 bg-red-600 text-white text-[10px] font-bold rounded-full hover:bg-red-700 transition-colors">Go to Login</Link></div>)}
+        {error && (<div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2"><span>{error}</span></div>)}
         
         <div className="text-right mb-4"><button onClick={handleUseProfile} disabled={profileLoading} className="text-[12px] italic text-gray-500 hover:text-blue-600 underline disabled:opacity-50 cursor-pointer">{profileLoading ? "Loading Profile..." : "Use My Profile"}</button></div>
         
