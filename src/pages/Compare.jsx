@@ -369,14 +369,14 @@ export default function Compare() {
   // --- RENDER ---
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center pt-20 bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center pt-40 bg-gray-50">
         <div className="text-xl font-bold text-[#0a0a5c] animate-pulse">Loading Comparison Data...</div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-6 pb-12 pt-8 min-h-screen font-sans">
+    <div className="max-w-6xl mx-auto px-6 pb-12 pt-30 min-h-screen font-sans">
       
       {/* HEADER */}
       <div className="mb-8 border-b pb-4 flex flex-col md:flex-row justify-between items-end gap-4">
