@@ -62,7 +62,7 @@ const Home = () => {
               // A. Ambil List ID dari ML (Contoh: ["R158", "R002"])
               const idList = await getUserFeed(userId);
               
-              // B. HYDRATION: Ganti ID jadi Object Sepatu Lengkap 
+              // B. 🔥 HYDRATION: Ganti ID jadi Object Sepatu Lengkap 🔥
               if (idList && idList.length > 0) {
                 // Handle jika response dibungkus object atau array langsung
                 const rawIds = Array.isArray(idList) ? idList : (idList.data || []);
@@ -96,7 +96,7 @@ const Home = () => {
           fetchData();
       }
     }
-  }, [allShoes.length]); // Re-run saat data sepatu di context selesai loading
+  }, [allShoes.length]); // 🔥 Re-run saat data sepatu di context selesai loading
 
   // --- 3. OBSERVER SCROLL ---
   useEffect(() => {
@@ -352,86 +352,67 @@ const Home = () => {
                 </div>
             </div>
 
-{/* GAMBAR SEPATU UTAMA + HOTSPOTS */}
+            {/* --- GAMBAR SEPATU UTAMA + HOTSPOTS --- */}
             <div 
                 className="relative z-10 w-[320px] xs:w-[350px] md:w-[600px] aspect-square flex items-center justify-center"
                 onClick={() => setActivePoint(null)}
             >
                 <img src={partOfShoeImg} alt="Parts of Shoes Diagram" className="w-full h-full object-contain drop-shadow-2xl"/>
                 
-                {shoeParts.map((part) => {
-                    // Logic sederhana untuk menentukan arah popup di mobile agar tidak keluar layar
-                    // Jika posisi titik < 50% (kiri), popup geser ke kanan (left-0)
-                    // Jika posisi titik > 50% (kanan), popup geser ke kiri (right-0)
-                    const isLeftSide = parseFloat(part.left) < 50;
-
-                    return (
+                {shoeParts.map((part) => (
+                    <div 
+                        key={part.id} 
+                        className="absolute w-8 h-8 flex items-center justify-center z-50" 
+                        style={{ top: part.top, left: part.left }}
+                    >
+                        {/* Hotspot Dot */}
                         <div 
-                            key={part.id} 
-                            className="absolute w-8 h-8 flex items-center justify-center z-50" 
-                            style={{ top: part.top, left: part.left }}
+                            className="relative w-8 h-8 flex items-center justify-center cursor-pointer group" 
+                            onClick={(e) => {
+                                e.stopPropagation(); 
+                                setActivePoint(activePoint === part.id ? null : part.id);
+                            }}
                         >
-                            {/* Hotspot Dot (Titik) */}
+                             {activePoint !== part.id && (<span className="absolute inline-flex h-full w-full rounded-full bg-[#537EC5] opacity-60 animate-ping"></span>)}
+                             <span className={`relative inline-flex rounded-full transition-all duration-300 border-2 shadow-lg ${activePoint === part.id ? 'h-5 w-5 bg-[#F39422] border-white ring-4 ring-[#F39422]/30' : 'h-4 w-4 bg-white border-[#537EC5] group-hover:scale-125'}`}></span>
+                        </div>
+
+                        {/* Tooltip Popup */}
+                        {activePoint === part.id && (
                             <div 
-                                className="relative w-8 h-8 flex items-center justify-center cursor-pointer group" 
-                                onClick={(e) => {
-                                    e.stopPropagation(); 
-                                    setActivePoint(activePoint === part.id ? null : part.id);
-                                }}
+                                className={`absolute top-1/2 -translate-y-1/2 flex items-center cursor-default w-[85vw] max-w-[320px] md:w-[400px] md:max-w-[400px] z-[60] 
+                                ${part.align === 'left' 
+                                    ? 'flex-row right-6 justify-end' // Desktop Left Align
+                                    : 'flex-row-reverse left-6 justify-end' // Desktop Right Align
+                                }
+                                md:${part.align === 'left' ? 'right-6' : 'left-6'}
+                                `}
+                                // Logika di atas: Di mobile, kita mungkin butuh penyesuaian posisi agar tidak off-screen, 
+                                // tapi untuk amannya saya pertahankan logic align user dengan lebar responsif.
+                                onClick={(e) => e.stopPropagation()} 
                             >
-                                {/* Ping Animation */}
-                                {activePoint !== part.id && (
-                                    <span className="absolute inline-flex h-full w-full rounded-full bg-[#537EC5] opacity-60 animate-ping"></span>
-                                )}
-                                {/* Core Dot */}
-                                <span className={`relative inline-flex rounded-full transition-all duration-300 border-2 shadow-lg ${activePoint === part.id ? 'h-6 w-6 bg-[#F39422] border-white ring-4 ring-[#F39422]/30' : 'h-4 w-4 bg-white border-[#537EC5] group-hover:scale-125'}`}></span>
-                            </div>
-
-                            {/* --- POPUP CARD (TOOLTIP) --- */}
-                            {activePoint === part.id && (
-                                <div 
-                                    className={`absolute top-full mt-3 z-[60] cursor-default
-                                    /* MOBILE STYLES: Width fixed, Smart Position */
-                                    w-[240px] ${isLeftSide ? 'left-[-10px]' : 'right-[-10px]'}
+                                <div className={`bg-white/95 backdrop-blur-md p-2 rounded-[2rem] shadow-2xl border border-white/50 animate-in fade-in zoom-in duration-300 flex items-center gap-3 md:gap-4 w-full ${part.align === 'left' ? 'flex-row' : 'flex-row-reverse text-right'}`}>
                                     
-                                    /* DESKTOP STYLES: Balik ke style connector line */
-                                    md:w-[400px] md:top-1/2 md:mt-0 md:-translate-y-1/2 md:auto
-                                    md:${part.align === 'left' ? 'right-8 left-auto' : 'left-8 right-auto'}
-                                    `}
-                                    onClick={(e) => e.stopPropagation()} 
-                                >
-                                    <div className={`
-                                        relative bg-white/90 backdrop-blur-xl p-3 md:p-4 rounded-2xl shadow-2xl border border-white/60 
-                                        flex items-center gap-3 animate-in fade-in zoom-in-95 duration-300 slide-in-from-top-2
-                                        ${part.align === 'left' ? 'md:flex-row' : 'md:flex-row-reverse md:text-right'}
-                                    `}>
-                                        
-                                        {/* Segitiga Kecil (Pointer) - Hanya di Mobile */}
-                                        <div className={`md:hidden absolute -top-2 w-4 h-4 bg-white rotate-45 border-t border-l border-white/60 ${isLeftSide ? 'left-4' : 'right-4'}`}></div>
-
-                                        {/* Gambar Thumbnail */}
-                                        <div className="w-14 h-14 md:w-20 md:h-20 rounded-full border-2 md:border-4 border-white shadow-md overflow-hidden bg-gray-100 shrink-0">
-                                            <img src={part.img} alt={part.title} className="w-full h-full object-cover" />
-                                        </div>
-
-                                        {/* Teks Konten */}
-                                        <div className="flex flex-col flex-1 min-w-0">
-                                            <h3 className="text-[#F39422] font-extrabold text-sm md:text-xl uppercase leading-none mb-1">{part.title}</h3>
-                                            <p className="text-[#293A80]/80 text-[11px] md:text-xs font-semibold leading-tight">{part.desc}</p>
-                                        </div>
+                                    {/* Text Content */}
+                                    <div className="flex flex-col justify-center flex-1 min-w-0 px-2">
+                                        <h3 className="text-[#F39422] font-black text-base md:text-xl uppercase leading-none mb-1 break-words">{part.title}</h3>
+                                        <p className="text-[#010038]/70 text-[10px] md:text-xs font-medium leading-snug w-full">{part.desc}</p>
                                     </div>
-                                    
-                                    {/* Garis Konektor (Hanya Desktop) */}
-                                    <div className={`hidden md:block absolute top-1/2 -translate-y-1/2 w-8 h-[2px] bg-[#F39422] 
-                                        ${part.align === 'left' ? '-right-8' : '-left-8'}
-                                    `}>
-                                         <div className={`absolute w-1.5 h-1.5 bg-[#F39422] rounded-full top-1/2 -translate-y-1/2 ${part.align === 'left' ? '-left-0' : '-right-0'}`}></div>
+
+                                    {/* Image Thumb */}
+                                    <div className="w-16 h-16 md:w-24 md:h-24 rounded-full border-4 border-white shadow-lg overflow-hidden bg-gray-100 relative shrink-0">
+                                        <img src={part.img} alt={part.title} className="w-full h-full object-cover" />
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                    );
-                })}
+                                
+                                {/* Connector Line */}
+                                <div className="hidden md:block w-8 md:w-16 h-[2px] bg-[#F39422] relative mx-2 shrink-0">
+                                     <div className={`absolute w-1.5 h-1.5 bg-[#F39422] rounded-full top-1/2 -translate-y-1/2 ${part.align === 'left' ? '-left-1' : '-right-1'}`}></div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
             </div>
         </div>
       </section>
