@@ -5,7 +5,7 @@ import rushLogo from "../assets/about-page/logo-dark1.svg";
 
 export default function About() {
   return (
-    <div className="pt-30">
+    <div className="pt-55 pb-5">
       {/* LOGO */}
       <div className="flex justify-center mb-0">
         <img 

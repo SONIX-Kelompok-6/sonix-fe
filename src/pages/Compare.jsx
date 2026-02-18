@@ -5,7 +5,7 @@ import api from "../api/axios";
 export default function Compare() {
   const [allShoesDb, setAllShoesDb] = useState([]); 
   
-  // OPTIMASI 1: Instant Load State
+  // OPTIMASI 1: Instant Load State (TETAP SAMA)
   const [selectedShoes, setSelectedShoes] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("compareList")) || [];
@@ -15,14 +15,17 @@ export default function Compare() {
   });
 
   const [favoriteIds, setFavoriteIds] = useState(new Set());
-  const [isLoading, setIsLoading] = useState(false); // Default false biar gak kedip
+  const [isLoading, setIsLoading] = useState(false); // Default false (TETAP SAMA, biar gak loading)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   
+  // 🔥 STATE BARU: Auth Error
+  const [authError, setAuthError] = useState(null);
+
   const navigate = useNavigate();
   const location = useLocation();
 
-  // --- 1. KONFIGURASI LOGIC TAMPILAN DATA ---
+  // --- 1. KONFIGURASI LOGIC TAMPILAN DATA (TETAP SAMA) ---
   const SPEC_CONFIG = [
     { label: "Lightweight", getValue: (s) => s.lightweight ? "✅" : "❌" },
     { label: "Rocker", getValue: (s) => s.rocker ? "✅" : "❌" },
@@ -242,10 +245,13 @@ export default function Compare() {
     const fetchData = async () => {
       const token = localStorage.getItem("userToken");
 
+      // 🔥 LOGIC BARU: CEK LOGIN
       if (!token) {
-        alert("Please login to use the Compare feature.");
-        navigate("/login");
-        return;
+        // Kalau gak ada token, set Error Message dan STOP fetching background
+        setAuthError("Please login to use the Compare feature.");
+        return; 
+      } else {
+        setAuthError(null);
       }
 
       try {
@@ -282,19 +288,11 @@ export default function Compare() {
           const results = await Promise.all(detailedPromises);
 
           // 🔥 FIX: RACE CONDITION CHECK 🔥
-          // Cek ulang LocalStorage SEKARANG. Siapa tau user udah hapus sesuatu pas lagi loading tadi.
           const currentLS = JSON.parse(localStorage.getItem("compareList")) || [];
-          
-          // Kita bikin Set ID yang VALID (yang masih ada di LS saat ini)
           const validIds = new Set(currentLS.map(i => i.shoe_id));
-
-          // Filter hasil download: Buang data yang ID-nya sudah gak ada di LS
           const safeResults = results.filter(r => validIds.has(r.shoe_id));
 
-          // Update State dengan data yang aman
           setSelectedShoes(safeResults);
-          
-          // Update LS lagi untuk menyimpan data detail yang baru didownload
           localStorage.setItem("compareList", JSON.stringify(safeResults));
 
         } else {
@@ -313,7 +311,6 @@ export default function Compare() {
       } catch (error) {
         console.error("Background sync error:", error);
         if (error.response && error.response.status === 401) {
-            alert("Session expired. Please login again.");
             localStorage.removeItem("userToken");
             navigate('/login');
         }
@@ -372,14 +369,14 @@ export default function Compare() {
   // --- RENDER ---
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center pt-20 bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center pt-40 bg-gray-50">
         <div className="text-xl font-bold text-[#0a0a5c] animate-pulse">Loading Comparison Data...</div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-6 pb-12 pt-8 min-h-screen font-sans">
+    <div className="max-w-6xl mx-auto px-6 pb-12 pt-30 min-h-screen font-sans">
       
       {/* HEADER */}
       <div className="mb-8 border-b pb-4 flex flex-col md:flex-row justify-between items-end gap-4">
@@ -387,10 +384,24 @@ export default function Compare() {
           <h1 className="text-3xl font-bold text-gray-800">Compare Shoes</h1>
           <p className="text-gray-500 text-sm mt-1">Differences are highlighted in color.</p>
         </div>
-        <div className="text-sm font-bold text-orange-500 bg-orange-50 px-4 py-2 rounded-lg border border-orange-100">
-          {selectedShoes.length} / 5 Slots Used
-        </div>
+        
+        {/* Sembunyikan slot count jika error */}
+        {!authError && (
+            <div className="text-sm font-bold text-orange-500 bg-orange-50 px-4 py-2 rounded-lg border border-orange-100">
+            {selectedShoes.length} / 5 Slots Used
+            </div>
+        )}
       </div>
+
+      {/* 🔥 1. BANNER ERROR (Disisipkan di sini) */}
+      {authError && (
+        <div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2 animate-in fade-in slide-in-from-top-2">
+            <span>{authError}</span>
+        </div>
+      )}
+
+      {/* --- WRAPPER UTAMA: Tampil tapi Disabled jika Error --- */}
+      <div className={`transition-all duration-300 ${authError ? 'opacity-50 grayscale pointer-events-none select-none' : ''}`}>
 
       {/* EMPTY STATE */}
       {selectedShoes.length === 0 ? (
@@ -399,7 +410,7 @@ export default function Compare() {
              className="w-full max-w-2xl flex flex-col items-center justify-center cursor-pointer group p-10 
                         border-2 border-dashed border-gray-300 rounded-3xl bg-white 
                         transition-all"
-             onClick={() => setIsModalOpen(true)}
+             onClick={() => !authError && setIsModalOpen(true)} // Prevent click if error
            >
               <div className="w-16 h-16 rounded-full bg-gray-50 shadow-sm flex items-center justify-center text-gray-400 
                               group-hover:bg-orange-500 group-hover:text-white transition-all duration-300 mb-4 
@@ -504,6 +515,8 @@ export default function Compare() {
            </div>
          </div>
       )}
+      
+      </div>
 
       {/* --- ADD SHOE MODAL --- */}
       {isModalOpen && (

@@ -1,22 +1,44 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { FaHeart, FaRegHeart, FaStar, FaPlus } from "react-icons/fa";
-import { sendInteraction } from "../services/SonixMl";
+import { sendInteraction } from "../services/SonixMl"; // 🔥 ML Service is BACK
 import Navbar from "../components/Navbar";
 import api from "../api/axios";
 import { useShoes } from "../context/ShoeContext"; 
+import Footer from "../components/Footer";
 
 export default function ShoeDetail() {
   const { slug } = useParams();
   const { allShoes, updateShoeState } = useShoes(); 
 
-  const [shoeData, setShoeData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // --- 🔥 1. INSTANT STATE INITIALIZATION (SPEED HACK) 🔥 ---
+  // Cari data SEBELUM render pertama.
+  const [shoeData, setShoeData] = useState(() => {
+      // A. Cek Cache Detail (LocalStorage) - Data lengkap
+      try {
+          const localKey = `shoe_detail_${slug}`;
+          const cached = localStorage.getItem(localKey);
+          if (cached) return JSON.parse(cached);
+      } catch (e) { console.warn(e); }
+
+      // B. Cek Context Global (RAM) - Data basic
+      if (allShoes && allShoes.length > 0) {
+          const found = allShoes.find(s => 
+              s.slug === slug || String(s.shoe_id) === slug || String(s.id) === slug
+          );
+          if (found) return found;
+      }
+
+      return null;
+  });
+
+  const [isLoading, setIsLoading] = useState(!shoeData);
   const [error, setError] = useState(null);
   const [newReview, setNewReview] = useState({ rating: 0, text: "" });
 
   // --- LOGIC GUEST NAME ---
   const token = localStorage.getItem("userToken");
+  const userId = localStorage.getItem("userId"); // Ambil User ID buat ML
   const userEmail = localStorage.getItem("userEmail");
   const userName = localStorage.getItem("userName");
 
@@ -37,69 +59,47 @@ export default function ShoeDetail() {
     return "User"; 
   })();
 
-  // --- UPDATE 1: LOGIC LOAD DATA DENGAN DETAIL CACHE ---
+  // --- 🔥 2. BACKGROUND FETCH & ML TRIGGER 🔥 ---
   useEffect(() => {
-    const loadData = async () => {
-      // A. Cek "Cache Khusus Detail" (Prioritas Utama - Data Lengkap)
-      // Ini menyimpan Review & Rating lengkap dari kunjungan terakhir
+    const syncData = async () => {
       const localDetailKey = `shoe_detail_${slug}`;
-      const localDetailCache = localStorage.getItem(localDetailKey);
-
-      if (localDetailCache) {
-         try {
-           const parsedData = JSON.parse(localDetailCache);
-           setShoeData(parsedData); // BOOM! Data lengkap (Review dll) langsung muncul
-           setIsLoading(false);
-         } catch (e) {
-           console.warn("Cache parse error", e);
-         }
-      } else {
-         // B. Kalau gak ada cache detail, cek Global Cache (Minimal Gambar & Nama muncul)
-         const globalCache = allShoes.find((s) => s.slug === slug);
-         if (globalCache) {
-            setShoeData(prev => ({ ...globalCache, ...prev })); 
-            setIsLoading(false);
-         } else {
-            setIsLoading(true);
-         }
-      }
-
-      setError(null);
-
+      
       try {
-        // C. Fetch Data Terbaru dari Server (Background Sync)
         const token = localStorage.getItem("userToken");
+        // Request ke server untuk data paling fresh
         const response = await api.get(
           `/api/shoes/${slug}/`,
           { headers: token ? { Authorization: `Token ${token}` } : {} }
         );
         
         const freshData = response.data;
+        
+        // Update State & Cache & Context
         setShoeData(freshData);
-
-        // 🔥 SIMPAN KE CACHE KHUSUS (Biar pas refresh berikutnya ngebut)
         localStorage.setItem(localDetailKey, JSON.stringify(freshData));
 
-        // Sync ke Global Context (Biar page Favorites update ratingnya)
         const updatedGlobalList = allShoes.map(s => 
             s.shoe_id === freshData.shoe_id ? { ...s, ...freshData } : s
         );
         updateShoeState(updatedGlobalList);
 
-      } catch (err) {
-        console.error("Error fetching detail:", err);
-        // Kalau cache juga gak ada, baru error
-        if (!shoeData && !localDetailCache) {
-           setError("Oops! The shoe you are looking for could not be found.");
+        // 🔥 ML TRIGGER: CLICK / VIEW (Implicit Feedback)
+        // Kita kirim sinyal bahwa user "tertarik" (click) barang ini
+        if (userId && freshData.shoe_id) {
+            sendInteraction(userId, freshData.shoe_id, 'click', 1).catch(err => 
+                console.warn("[ML] Gagal kirim click data", err)
+            );
         }
+
+      } catch (err) {
+        console.error("Background sync error:", err);
+        if (!shoeData) setError("Oops! The shoe you are looking for could not be found.");
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (slug) {
-      loadData();
-    }
+    if (slug) syncData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]); 
 
@@ -112,7 +112,6 @@ export default function ShoeDetail() {
       return;
     }
 
-    const token = localStorage.getItem("userToken");
     if (!token) {
       alert("Please login first to submit a review.");
       return;
@@ -132,7 +131,7 @@ export default function ShoeDetail() {
     const currentSumRating = currentReviews.reduce((sum, r) => sum + r.rating, 0);
     const updatedAverage = (currentSumRating + newReview.rating) / newTotalReviews;
 
-    // Optimistic Update Lokal
+    // Optimistic Update
     const updatedShoeData = {
         ...shoeData,
         rating: Number(updatedAverage.toFixed(1)), 
@@ -141,11 +140,8 @@ export default function ShoeDetail() {
 
     setShoeData(updatedShoeData);
     setNewReview({ rating: 0, text: "" }); 
-
-    // 🔥 UPDATE 2: UPDATE JUGA CACHE KHUSUS (Biar pas refresh review barunya gak ilang)
     localStorage.setItem(`shoe_detail_${slug}`, JSON.stringify(updatedShoeData));
 
-    // Update Global Context
     const updatedGlobalList = allShoes.map(s => 
         s.shoe_id === shoeData.shoe_id ? { ...s, rating: updatedShoeData.rating } : s
     );
@@ -161,6 +157,15 @@ export default function ShoeDetail() {
         },
         { headers: { Authorization: `Token ${token}` } }
       );
+
+      // 🔥 ML TRIGGER: RATE & REVIEW
+      if (userId) {
+          // Kirim Rating (Explicit Feedback kuat)
+          sendInteraction(userId, shoeData.shoe_id, 'rate', newReview.rating).catch(console.warn);
+          // Kirim Review (Menandakan engagement tinggi)
+          sendInteraction(userId, shoeData.shoe_id, 'review', 1).catch(console.warn);
+      }
+
     } catch (err) {
       console.error("Failed to submit review:", err);
       alert("Failed to submit review. Please check your connection.");
@@ -169,9 +174,6 @@ export default function ShoeDetail() {
 
 
   const handleToggleFavorite = async () => {
-    const token = localStorage.getItem("userToken");
-    const userId = localStorage.getItem("userId"); 
-
     if (!token) {
       alert("Please login first to save this shoe to your favorites.");
       return;
@@ -179,16 +181,13 @@ export default function ShoeDetail() {
 
     const previousStatus = shoeData.isFavorite;
     const newStatus = !previousStatus;
-    const interactionValue = previousStatus ? 0 : 1;
+    const interactionValue = newStatus ? 1 : 0; // 1 = Like, 0 = Unlike (Netral/Dislike)
 
-    // Update UI Lokal
+    // Optimistic Update
     const updatedShoeData = { ...shoeData, isFavorite: newStatus };
     setShoeData(updatedShoeData);
-
-    // Update Cache Khusus (Biar pas refresh statusnya inget)
     localStorage.setItem(`shoe_detail_${slug}`, JSON.stringify(updatedShoeData));
 
-    // Update Context Global
     const updatedGlobalList = allShoes.map(s => 
         s.shoe_id === shoeData.shoe_id ? { ...s, isFavorite: newStatus } : s
     );
@@ -200,14 +199,18 @@ export default function ShoeDetail() {
         { shoe_id: String(shoeData.shoe_id) }, 
         { headers: { Authorization: `Token ${token}` } }
       );
-      
+
+      // 🔥 ML TRIGGER: LIKE
       if (userId) {
+          // Kirim Like ke ML.
+          // Note: Beberapa model ML mungkin butuh 'unlike' (value 0) atau cuma butuh 'like' (value 1) aja.
+          // Di sini kita kirim statusnya.
           sendInteraction(userId, shoeData.shoe_id, 'like', interactionValue).catch(console.warn);
       }
 
     } catch (err) {
       console.error("Failed to update favorite:", err);
-      // Rollback logic...
+      // Rollback
       setShoeData({ ...shoeData, isFavorite: previousStatus });
       updateShoeState(allShoes); 
       alert("Something went wrong. Please try again later.");
@@ -246,14 +249,14 @@ export default function ShoeDetail() {
   return (
     <div className="min-h-screen bg-[#4a76a8]">
       <Navbar />
-      <div className="container mx-auto px-4 pt-24 pb-12">
+      <div className="container mx-auto px-14 pt-35 pb-2">
         <div className="bg-white rounded-3xl overflow-hidden shadow-xl">
           <div className="flex flex-col md:flex-row">
             <div className="md:w-1/2 p-8 flex items-center justify-center bg-gray-100">
               <img
                 src={shoeData.mainImage || shoeData.img_url || "https://via.placeholder.com/500"} 
                 alt={shoeData.model}
-                className="max-w-full h-auto transform hover:scale-105 transition-transform duration-300"
+                className="w-3/4 max-w-md h-auto object-contain transform hover:scale-105 transition-transform duration-300 drop-shadow-lg"
               />
             </div>
 
@@ -289,16 +292,254 @@ export default function ShoeDetail() {
           </div>
         </div>
 
-        <div className="mt-8">
-          <h2 className="text-3xl font-bold text-white text-center mb-6 tracking-wider">EXPLORE</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {shoeData.explore?.map((item) => (
-              <Link to={`/shoe/${item.slug}`} key={item.id} className="bg-[#e9eef5] rounded-xl overflow-hidden shadow-md border-4 border-orange-300 hover:border-orange-500 transition-all group">
-                <div className="p-6 flex items-center justify-center">
-                  <img src={item.image} alt="Explore Shoe" className="max-w-full h-auto group-hover:scale-105 transition-transform duration-300" />
+        {/* --- TECH SPECS MANUAL LAYOUT --- */}
+        <div className="mt-12">
+          <h2 className="text-3xl font-black text-white text-center mb-8 tracking-widest uppercase">
+            Specification
+          </h2>
+
+          <div className="bg-white rounded-3xl p-8 shadow-2xl border border-gray-100">
+            {(() => {
+              const isTrail = String(shoeData.shoe_id).toUpperCase().startsWith('T');
+              const isRoad = !isTrail;
+
+              const renderPace = () => {
+                let p = [];
+                if (shoeData.pace_daily_running) p.push("Daily");
+                if (shoeData.pace_tempo) p.push("Tempo");
+                if (shoeData.pace_competition) p.push("Race");
+                return p.length > 0 ? p.join(", ") : "-";
+              };
+
+              const renderTerrain = () => {
+                let t = [];
+                if (shoeData.terrain_light) t.push("Light");
+                if (shoeData.terrain_moderate) t.push("Moderate");
+                if (shoeData.terrain_technical) t.push("Technical");
+                return t.length > 0 ? t.join(", ") : "-";
+              };
+
+              const renderWaterproof = () => {
+                if (shoeData.waterproof) return "Waterproof";
+                if (shoeData.water_repellent) return "Water Repellent";
+                return "❌";
+              };
+
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                  {/* KOLOM 1 */}
+                  <div className="space-y-5 lg:border-l lg:border-gray-200 lg:pl-6">
+                    {isTrail && (
+                      <div>
+                        <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Best For Terrain</p>
+                        <p className="text-gray-800 font-bold">{renderTerrain()}</p>
+                      </div>
+                    )}
+                    {isRoad && (
+                      <div>
+                        <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Best For Pace</p>
+                        <p className="text-gray-800 font-bold">{renderPace()}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Arch Type</p>
+                      <p className="text-gray-800 font-bold">
+                        {shoeData.arch_neutral ? "Neutral" : shoeData.arch_stability ? "Stability" : "-"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Lightweight</p>
+                      <p className="text-gray-800 font-bold">{shoeData.lightweight ? "✅" : "❌"}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Rocker</p>
+                      <p className="text-gray-800 font-bold">{shoeData.rocker ? "✅" : "❌"}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Removable Insole</p>
+                      <p className="text-gray-800 font-bold">{shoeData.removable_insole ? "✅" : "❌"}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Plate</p>
+                      <p className="text-gray-800 font-bold">{shoeData.plate ? "✅" : "❌"}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Strike Pattern</p>
+                      <p className="text-gray-800 font-bold">
+                        {shoeData.strike_heel ? "Heel" : shoeData.strike_mid ? "Midfoot" : shoeData.strike_forefoot ? "Forefoot" : "-"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* KOLOM 2 */}
+                  <div className="space-y-5 lg:border-l lg:border-gray-200 lg:pl-6">
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Heel Stack</p>
+                      <p className="text-gray-800 font-bold">{shoeData.heel_lab_mm ? `${shoeData.heel_lab_mm} mm` : "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Forefoot Stack</p>
+                      <p className="text-gray-800 font-bold">{shoeData.forefoot_lab_mm ? `${shoeData.forefoot_lab_mm} mm` : "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Drop</p>
+                      <p className="text-gray-800 font-bold">{shoeData.drop_lab_mm ? `${shoeData.drop_lab_mm} mm` : "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Weight</p>
+                      <p className="text-gray-800 font-bold">{shoeData.weight_lab_oz ? `${shoeData.weight_lab_oz} oz` : "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Stiffness</p>
+                      <p className="text-gray-800 font-bold">
+                        {shoeData.stiffness_scaled === 1 ? "Flexible" :
+                        shoeData.stiffness_scaled === 3 ? "Moderate" :
+                        shoeData.stiffness_scaled === 5 ? "Stiff" : "-"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Heel Counter Stiffness</p>
+                      <p className="text-gray-800 font-bold">
+                        {shoeData.heel_stiff === 1 ? "Flexible" : 
+                        shoeData.heel_stiff === 3 ? "Moderate" : 
+                        shoeData.heel_stiff === 5 ? "Stiff" : "-"}
+                      </p>
+                    </div>
+                    {isTrail && (
+                      <div>
+                        <p className="text-gray-400 text-xs font-bold">Shock Absorption</p>
+                        <p className="text-gray-800 font-bold">
+                          {shoeData.shock_absorption === 1 ? "Low" :
+                          shoeData.shock_absorption === 3 ? "Moderate" :
+                          shoeData.shock_absorption === 5 ? "High" : "-"}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* KOLOM 3 */}
+                  <div className="space-y-5 lg:border-l lg:border-gray-200 lg:pl-6">
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Midsole Softness</p>
+                      <p className="text-gray-800 font-bold">
+                        {shoeData.midsole_softness === 1 ? "Firm" : 
+                        shoeData.midsole_softness === 3 ? "Balance" :
+                        shoeData.midsole_softness === 5 ? "Soft" : "-"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Torsional Rigidity</p>
+                      <p className="text-gray-800 font-bold">
+                        {shoeData.torsional_rigidity === 1 ? "Flexible" : 
+                        shoeData.torsional_rigidity === 3 ? "Moderate" : 
+                        shoeData.torsional_rigidity === 5 ? "Stiff" : "-"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Breathability</p>
+                      <p className="text-gray-800 font-bold">
+                        {shoeData.breathability_scaled === 1 ? "Warm" : 
+                        shoeData.breathability_scaled === 3 ? "Moderate" : 
+                        shoeData.breathability_scaled === 4 ? "Good" :
+                        shoeData.breathability_scaled === 5 ? "Breathable" : "-"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Toebox Durability</p>
+                      <p className="text-gray-800 font-bold">
+                        {shoeData.toebox_durability === 1 ? "Very Bad" : 
+                        shoeData.toebox_durability === 2 ? "Bad" : 
+                        shoeData.toebox_durability === 3 ? "Decent" :
+                        shoeData.toebox_durability === 4 ? "Good" :
+                        shoeData.toebox_durability === 5 ? "Very Good" : "-"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Heel Padding Durability</p>
+                      <p className="text-gray-800 font-bold">
+                        {shoeData.heel_durability === 1 ? "Very Bad" : 
+                        shoeData.heel_durability === 2 ? "Bad" : 
+                        shoeData.heel_durability === 3 ? "Decent" :
+                        shoeData.heel_durability === 4 ? "Good" :
+                        shoeData.heel_durability === 5 ? "Very Good" : "-"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Outsole Durability</p>
+                      <p className="text-gray-800 font-bold">
+                        {shoeData.outsole_durability === 1 ? "Very Bad" : 
+                        shoeData.outsole_durability === 2 ? "Bad" : 
+                        shoeData.outsole_durability === 3 ? "Decent" :
+                        shoeData.outsole_durability === 4 ? "Good" :
+                        shoeData.outsole_durability === 5 ? "Very Good" : "-"}
+                      </p>
+                    </div>
+                    {isTrail && (
+                      <div>
+                        <p className="text-gray-400 text-xs font-bold">Energy Return</p>
+                        <p className="text-gray-800 font-bold">
+                          {shoeData.energy_return === 1 ? "Low" :
+                          shoeData.energy_return === 3 ? "Moderate" :
+                          shoeData.energy_return === 5 ? "High" : "-"}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* KOLOM 4 */}
+                  <div className="space-y-5 lg:border-l lg:border-gray-200 lg:pl-6">
+                    {isRoad && (
+                      <div>
+                        <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Best For Pace</p>
+                        <p className="text-gray-800 font-bold">{renderPace()}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Width Fit</p>
+                      <p className="text-gray-800 font-bold">
+                        {shoeData.width_fit === 1 ? "Narrow" :
+                        shoeData.width_fit === 3 ? "Medium" :
+                        shoeData.width_fit === 5 ? "Wide" : "-"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Toebox Width</p>
+                      <p className="text-gray-800 font-bold">
+                        {shoeData.toebox_width === 1 ? "Narrow" :
+                        shoeData.toebox_width === 3 ? "Medium" :
+                        shoeData.toebox_width === 5 ? "Wide" : "-"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Season</p>
+                      <p className="text-gray-800 font-bold">
+                        {shoeData.season_all ? "All Season" : shoeData.season_summer ? "Summer" : "Winter"}
+                      </p>
+                    </div>
+                    {isTrail && (
+                      <div className="space-y-5">
+                        <div>
+                          <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Lug Depth (mm)</p>
+                          <p className="text-gray-800 font-bold">{shoeData.lug_dept_mm} mm</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Traction</p>
+                          <p className="text-gray-800 font-bold">
+                            {shoeData.traction_scaled === 1 ? "Low" : 
+                            shoeData.traction_scaled === 3 ? "Moderate" :
+                            shoeData.traction_scaled === 5 ? "High" : "-"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Waterproof</p>
+                          <p className="text-gray-800 font-bold text-sm">{renderWaterproof()}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </Link>
-            ))}
+              );
+            })()}
           </div>
         </div>
 
@@ -344,6 +585,7 @@ export default function ShoeDetail() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }
