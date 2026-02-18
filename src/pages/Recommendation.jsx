@@ -535,9 +535,11 @@ export default function Recommendation() {
             ← BACK
         </button>
 
-        <h1 className="text-center font-serif font-bold text-lg mb-1 mt-4 uppercase tracking-wider">{step === "road" ? "User Input Road" : "User Input Trail"}</h1>
+        <h1 className="text-center font-bold text-2xl text-gray-800 mb-4 mt-2 uppercase tracking-widest">
+          {step === "road" ? "User Input Road" : "User Input Trail"}
+        </h1>
         {error && (<div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2"><span>{error}</span><Link to="/login" className="px-4 py-1.5 bg-red-600 text-white text-[10px] font-bold rounded-full hover:bg-red-700 transition-colors">Go to Login</Link></div>)}
-        <div className="text-right mb-4"><button onClick={handleUseProfile} disabled={profileLoading} className="text-[12px] italic text-gray-500 hover:text-blue-600 underline disabled:opacity-50">{profileLoading ? "Loading Profile..." : "Use My Profile"}</button></div>
+        <div className="text-right mb-4"><button onClick={handleUseProfile} disabled={profileLoading} className="text-[12px] italic text-gray-500 hover:text-blue-600 underline disabled:opacity-50 cursor-pointer">{profileLoading ? "Loading Profile..." : "Use My Profile"}</button></div>
         
         {/* ... FORM INPUTS (TETAP SAMA) ... */}
         <div className="mb-6 text-left"><label className="block text-sm font-bold mb-3 uppercase text-gray-800">Foot Width Type <span className="text-red-500">*</span></label><div className="grid grid-cols-3 gap-3">{widthOptions.map((opt) => (<button key={opt.label} onClick={() => handleToggleSelect('footWidth', opt.value)} className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center transition-all ${commonData.footWidth === opt.value ? activeStyle : inactiveStyle}`}><img src={opt.img} alt={opt.label} className="h-10 w-auto mb-2" /><span className="text-[12px] font-bold">{opt.label}</span></button>))}</div></div>
