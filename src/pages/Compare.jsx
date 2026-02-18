@@ -15,10 +15,7 @@ export default function Compare() {
   });
 
   const [favoriteIds, setFavoriteIds] = useState(new Set());
-  
-  // OPTIMASI 2: Matikan Loading Awal
-  const [isLoading, setIsLoading] = useState(false);
-  
+  const [isLoading, setIsLoading] = useState(false); // Default false biar gak kedip
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -243,7 +240,6 @@ export default function Compare() {
   // --- 2. FETCH DATA DARI BACKEND (BACKGROUND SYNC) ---
   useEffect(() => {
     const fetchData = async () => {
-      // OPTIMASI: Jangan setIsLoading(true) di sini biar gak muncul spinner
       const token = localStorage.getItem("userToken");
 
       if (!token) {
@@ -253,7 +249,7 @@ export default function Compare() {
       }
 
       try {
-        // A. Ambil List Semua Sepatu
+        // A. Ambil List Semua Sepatu (Untuk Modal Search)
         const shoesResponse = await api.get("/api/shoes/", {
           headers: { 'Authorization': `Token ${token}` }
         });
@@ -263,7 +259,7 @@ export default function Compare() {
           setAllShoesDb(shoesList);
         }
 
-        // --- LOGIC HYDRATION SAFE MODE ---
+        // --- LOGIC HYDRATION & FIX GHOST BUG ---
         const savedList = JSON.parse(localStorage.getItem("compareList")) || [];
 
         if (savedList.length > 0) {
@@ -282,9 +278,25 @@ export default function Compare() {
             }
           });
 
+          // Tunggu semua request selesai...
           const results = await Promise.all(detailedPromises);
-          setSelectedShoes(results);
-          localStorage.setItem("compareList", JSON.stringify(results));
+
+          // 🔥 FIX: RACE CONDITION CHECK 🔥
+          // Cek ulang LocalStorage SEKARANG. Siapa tau user udah hapus sesuatu pas lagi loading tadi.
+          const currentLS = JSON.parse(localStorage.getItem("compareList")) || [];
+          
+          // Kita bikin Set ID yang VALID (yang masih ada di LS saat ini)
+          const validIds = new Set(currentLS.map(i => i.shoe_id));
+
+          // Filter hasil download: Buang data yang ID-nya sudah gak ada di LS
+          const safeResults = results.filter(r => validIds.has(r.shoe_id));
+
+          // Update State dengan data yang aman
+          setSelectedShoes(safeResults);
+          
+          // Update LS lagi untuk menyimpan data detail yang baru didownload
+          localStorage.setItem("compareList", JSON.stringify(safeResults));
+
         } else {
           setSelectedShoes([]);
         }
@@ -386,7 +398,7 @@ export default function Compare() {
            <div 
              className="w-full max-w-2xl flex flex-col items-center justify-center cursor-pointer group p-10 
                         border-2 border-dashed border-gray-300 rounded-3xl bg-white 
-                        transition-all"  // UBAH: Menghapus hover:shadow, hover:scale, dll
+                        transition-all"
              onClick={() => setIsModalOpen(true)}
            >
               <div className="w-16 h-16 rounded-full bg-gray-50 shadow-sm flex items-center justify-center text-gray-400 
@@ -394,8 +406,6 @@ export default function Compare() {
                               border border-gray-200 group-hover:border-orange-500">
                 <span className="text-3xl font-light mb-1">+</span>
               </div>
-              
-              {/* UBAH: Styling Teks agar mirip Page Favorites */}
               <h2 className="text-xl font-bold text-gray-700">Start Comparison</h2>
               <p className="text-gray-500 mt-2">Click to add your first shoe</p>
            </div>
