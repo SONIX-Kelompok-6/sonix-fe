@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-// --- IMPORT SERVICE ML (NEW) ---
+// --- IMPORT SERVICE ML ---
 import { getUserFeed } from "../services/SonixMl"; 
+
+// --- IMPORT CONTEXT (WAJIB BUAT HYDRATION) ---
+import { useShoes } from "../context/ShoeContext"; 
 
 // --- IMPORT ASET ---
 import shoeImg from '../assets/home-images/home-shoe.webp'; 
@@ -20,10 +23,13 @@ import sonixMemberImg from '../assets/home-images/sonix-member.png';
 const Home = () => {
   const navigate = useNavigate();
   
+  // --- 1. AMBIL GUDANG DATA (CONTEXT) ---
+  const { allShoes } = useShoes(); 
+
   // State untuk melacak titik mana yang aktif (Section 2)
   const [activePoint, setActivePoint] = useState(null); 
 
-  // --- STATE UNTUK FITUR FEED (NEW) ---
+  // --- STATE UNTUK FITUR FEED ---
   const [userFeed, setUserFeed] = useState([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isFeedVisible, setIsFeedVisible] = useState(false);
@@ -39,7 +45,7 @@ const Home = () => {
   const [isAboutVisible, setIsAboutVisible] = useState(false); // About
   const aboutRef = useRef(null);
 
-// --- 1. FETCH FEED DATA (STRICT MODE: MURNI COLLABORATIVE) ---
+// --- 2. FETCH & HYDRATE FEED DATA ---
   useEffect(() => {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId");
@@ -47,34 +53,52 @@ const Home = () => {
     if (token && userId) {
       setIsLoggedIn(true);
       
-      const fetchData = async () => {
-        try {
-          console.log("Mencoba ambil feed personal murni...");
-          
-          // 1. Ambil Feed Personal
-          const data = await getUserFeed(userId);
-          
-          // 2. Langsung cek hasil
-          if (data && data.length > 0) {
-            setUserFeed(data.slice(0, 4));
-            console.log("Data Personal ditemukan:", data.length);
-          } else {
-            // KALAU KOSONG, BIARKAN KOSONG (JANGAN PANGGIL REKOMENDASI UMUM)
-            console.log("Feed personal kosong. Section disembunyikan (Strict Mode).");
-            setUserFeed([]); 
-          }
-          
-        } catch (err) {
-          console.error("Gagal load feed:", err);
-          setUserFeed([]); 
-        }
-      };
-      
-      fetchData();
-    }
-  }, []);
+      // Pastikan Context (allShoes) sudah siap sebelum mapping
+      if (allShoes.length > 0) {
+          const fetchData = async () => {
+            try {
+              console.log("Mencoba ambil feed personal murni...");
+              
+              // A. Ambil List ID dari ML (Contoh: ["R158", "R002"])
+              const idList = await getUserFeed(userId);
+              
+              // B. 🔥 HYDRATION: Ganti ID jadi Object Sepatu Lengkap 🔥
+              if (idList && idList.length > 0) {
+                // Handle jika response dibungkus object atau array langsung
+                const rawIds = Array.isArray(idList) ? idList : (idList.data || []);
 
-  // --- 2. OBSERVER SCROLL (UPDATE UNTUK FEED) ---
+                const hydratedFeed = rawIds.map(targetId => {
+                    // Bersihkan ID (String & Trim)
+                    const cleanId = String(targetId).trim();
+                    
+                    // Cari sepatu di gudang (Context)
+                    return allShoes.find(s => 
+                        String(s.shoe_id) === cleanId || 
+                        String(s.id) === cleanId || 
+                        String(s.slug) === cleanId
+                    );
+                }).filter(item => item !== undefined); // Buang yang tidak ketemu (null/undefined)
+
+                // Ambil 4 item pertama saja buat di Home
+                setUserFeed(hydratedFeed.slice(0, 4));
+                console.log("✅ Feed Personal Berhasil Diload:", hydratedFeed.length);
+              } else {
+                console.log("Feed personal kosong.");
+                setUserFeed([]); 
+              }
+              
+            } catch (err) {
+              console.error("Gagal load feed:", err);
+              setUserFeed([]); 
+            }
+          };
+          
+          fetchData();
+      }
+    }
+  }, [allShoes.length]); // 🔥 Re-run saat data sepatu di context selesai loading
+
+  // --- 3. OBSERVER SCROLL ---
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -83,14 +107,12 @@ const Home = () => {
           if (entry.target === sec3Ref.current && entry.isIntersecting) setIsSec3Visible(true);
           if (entry.target === aboutRef.current && entry.isIntersecting) setIsAboutVisible(true);
           
-          // Observer untuk Section Feed Baru
           if (entry.target === feedRef.current && entry.isIntersecting) setIsFeedVisible(true);
         });
       },
       { threshold: 0.15 } 
     );
 
-    // Observe element jika ada
     if (sectionRef.current) observer.observe(sectionRef.current);
     if (sec3Ref.current) observer.observe(sec3Ref.current);
     if (aboutRef.current) observer.observe(aboutRef.current);
@@ -99,7 +121,7 @@ const Home = () => {
     return () => {
       observer.disconnect();
     };
-  }, [userFeed]); // Re-run observer saat userFeed berubah (karena ref baru muncul)
+  }, [userFeed]); 
 
   // DATA BAGIAN SEPATU (Section 2)
   const shoeParts = [
@@ -113,7 +135,7 @@ const Home = () => {
     <div className="w-full bg-white font-sans selection:bg-[#F39422] selection:text-white overflow-x-hidden">
       
       {/* =========================================================================
-          SECTION 1: HERO SECTION (TIDAK BERUBAH)
+          SECTION 1: HERO SECTION
       ========================================================================= */}
       <section className="relative w-full min-h-screen relative overflow-hidden">
         <div className="absolute inset-0 w-full h-full z-0 pointer-events-none">
@@ -177,15 +199,13 @@ const Home = () => {
         </div>
         <div className="absolute bottom-0 left-0 w-full z-20 pointer-events-none">
            <svg viewBox="0 0 1440 160" className="w-full h-auto min-h-[120px]" preserveAspectRatio="none">
-               {/* Modifikasi kurva sedikit agar nyambung ke section bawahnya */}
                <path fill={isLoggedIn && userFeed.length > 0 ? "#F8FAFC" : "#F8FAFC"} ></path>
            </svg>
         </div>
       </section>
 
       {/* =========================================================================
-          SECTION 1.5: PERSONALIZED FEED (SECTION BARU!)
-          Hanya tampil jika user Login & Ada Data Feed dari ML
+          SECTION 1.5: PERSONALIZED FEED (HYDRATED)
       ========================================================================= */}
       {isLoggedIn && userFeed.length > 0 && (
         <section 
@@ -193,46 +213,34 @@ const Home = () => {
             className="relative w-full py-20 bg-slate-50 border-b border-slate-200 overflow-hidden"
         >
             <div className="container max-w-7xl mx-auto px-6">
-                {/* Header Section */}
                 <div className={`flex flex-col md:flex-row justify-between items-end mb-12 transition-all duration-1000 ${isFeedVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
                     <div>
                         <h2 className="text-4xl md:text-5xl font-black text-[#010038]">
                             YOU MIGHT ALSO <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F39422] to-[#E67E22]">LIKE</span>
                         </h2>
                     </div>
-                    {/* Link ke halaman Recommendation penuh
-                    <Link to="/recommendation" className="hidden md:flex items-center gap-2 text-[#293A80] font-bold hover:text-[#F39422] transition-colors group">
-                        VIEW ALL RECOMMENDATIONS
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                        </svg>
-                    </Link> */}
                 </div>
 
-                {/* Grid Sepatu (Maksimal 4 item) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     {userFeed.map((shoe, index) => (
                         <div 
                             key={shoe.id || index}
-                            onClick={() => navigate(`/shoe/${shoe.slug}`)}
+                            onClick={() => navigate(`/shoe/${shoe.slug || shoe.shoe_id}`)}
                             className={`group bg-white rounded-3xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_rgba(41,58,128,0.15)] border border-slate-100 hover:border-[#537EC5]/30 transition-all duration-500 cursor-pointer flex flex-col items-center relative overflow-hidden
                                 ${isFeedVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'}
                             `}
                             style={{ transitionDelay: `${index * 100}ms` }}
                         >
-                            {/* Decorative Blob di belakang kartu */}
                             <div className="absolute top-[-50px] right-[-50px] w-32 h-32 bg-[#537EC5]/10 rounded-full blur-2xl group-hover:bg-[#F39422]/10 transition-colors duration-500"></div>
 
-                            {/* Gambar Sepatu */}
                             <div className="w-full h-40 flex items-center justify-center mb-4 relative z-10">
                                 <img 
-                                    src={shoe.img_url || shoe.img} 
+                                    src={shoe.img_url || shoe.img || shoe.mainImage} 
                                     alt={shoe.name} 
                                     className="w-full h-full object-contain mix-blend-multiply transform group-hover:scale-105 transition-transform duration-300"
                                 />
                             </div>
 
-                            {/* Info Sepatu */}
                             <div className="w-full text-left relative z-10">
                                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">{shoe.brand}</p>
                                 <h3 className="text-lg font-bold text-[#010038] leading-tight line-clamp-2 group-hover:text-[#293A80] transition-colors">
@@ -240,14 +248,12 @@ const Home = () => {
                                 </h3>
                                 
                                 <div className="mt-4 flex items-center justify-between">
-                                    {/* Rating Badge */}
                                     <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg">
                                         <svg className="w-4 h-4 text-[#F39422]" fill="currentColor" viewBox="0 0 24 24">
                                             <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
                                         </svg>
                                         <span className="text-sm font-bold text-slate-700">{shoe.rating ? shoe.rating : 0.0}</span>
                                     </div>
-                                    {/* Action Button Kecil */}
                                     <span className="w-8 h-8 rounded-full bg-[#293A80] flex items-center justify-center text-white group-hover:bg-[#F39422] transition-colors shadow-lg">
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -258,29 +264,20 @@ const Home = () => {
                         </div>
                     ))}
                 </div>
-                
-                {/* Mobile View All Button
-                <div className="mt-8 flex justify-center md:hidden">
-                    <Link to="/recommendation" className="px-8 py-3 bg-white border border-[#293A80] text-[#293A80] font-bold rounded-full hover:bg-[#293A80] hover:text-white transition-all shadow-sm">
-                        VIEW ALL
-                    </Link>
-                </div> */}
             </div>
         </section>
       )}
 
 
       {/* =========================================================================
-          SECTION 2: PARTS OF SHOES (TIDAK BERUBAH)
+          SECTION 2: PARTS OF SHOES
       ========================================================================= */}
       <section 
         ref={sectionRef} 
         className="relative w-full min-h-[120vh] bg-slate-50 flex items-center justify-center overflow-hidden py-24">
         
-        {/* Gradient Shadow */}
         <div className="absolute top-0 left-0 w-full h-40 bg-gradient-to-b from-[#537EC5]/20 to-transparent pointer-events-none z-0"></div>
 
-        {/* Tech Grid Pattern */}
         <div className="absolute inset-0 z-0 opacity-40 pointer-events-none" 
              style={{ 
                  backgroundImage: 'linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(90deg, #cbd5e1 1px, transparent 1px)', 
@@ -289,23 +286,20 @@ const Home = () => {
         </div>
 
         <div className="relative w-full max-w-5xl h-[600px] flex items-center justify-center">
-            {/* BACKGROUND STRIPES - Updated to Palette */}
+            {/* BACKGROUND STRIPES */}
             <div className="absolute z-0 flex flex-col gap-3 -rotate-[15deg] origin-bottom-left translate-y-[-33%] translate-x-[70%]">
-                {/* Orange #F39422 */}
                 <div className="w-[500px] md:w-[700px] h-16 md:h-24 bg-[#F39422] flex items-center pl-30 md:pl-40 rounded-r-full shadow-sm overflow-hidden">
                     <h2 className={`text-white font-black text-4xl md:text-6xl tracking-wider drop-shadow-sm transition-all duration-1000 ease-out ${isVisible ? 'translate-x-0 opacity-100' : 'translate-x-[200px] opacity-0'}`}>PARTS</h2>
                 </div>
-                {/* Light Blue #537EC5 */}
                 <div className="w-[500px] md:w-[700px] h-16 md:h-24 bg-[#537EC5] flex items-center pl-24 md:pl-60 rounded-r-full shadow-sm -ml-8 overflow-hidden">
                     <h2 className={`text-white font-black text-4xl md:text-6xl tracking-wider drop-shadow-sm transition-all duration-1000 delay-100 ease-out ${isVisible ? 'translate-x-0 opacity-100' : 'translate-x-[200px] opacity-0'}`}>OF</h2>
                 </div>
-                {/* Mid Blue #293A80 */}
                 <div className="w-[500px] md:w-[700px] h-16 md:h-24 bg-[#293A80] flex items-center pl-24 md:pl-70 rounded-r-full shadow-sm -ml-30 overflow-hidden">
                     <h2 className={`text-white font-black text-4xl md:text-6xl tracking-wider drop-shadow-sm transition-all duration-1000 delay-200 ease-out ${isVisible ? 'translate-x-0 opacity-100' : 'translate-x-[200px] opacity-0'}`}>SHOES</h2>
                 </div>
             </div>
 
-            {/* GAMBAR SEPATU UTAMA + INTERACTIVE HOTSPOTS */}
+            {/* GAMBAR SEPATU UTAMA + HOTSPOTS */}
             <div 
                 className="relative z-10 w-[350px] md:w-[600px] aspect-square flex items-center justify-center"
                 onClick={() => setActivePoint(null)}
@@ -325,12 +319,11 @@ const Home = () => {
                                 setActivePoint(activePoint === part.id ? null : part.id);
                             }}
                         >
-                             {/* Hotspot color: Cyan/Light Blue related */}
                              {activePoint !== part.id && (<span className="absolute inline-flex h-full w-full rounded-full bg-[#537EC5] opacity-60 animate-ping"></span>)}
                              <span className={`relative inline-flex rounded-full transition-all duration-300 border-2 shadow-lg ${activePoint === part.id ? 'h-5 w-5 bg-[#F39422] border-white ring-4 ring-[#F39422]/30' : 'h-4 w-4 bg-white border-[#537EC5] group-hover:scale-125'}`}></span>
                         </div>
 
-                        {/* Popup Tooltip */}
+                        {/* Tooltip */}
                         {activePoint === part.id && (
                             <div 
                                 className={`absolute top-1/2 -translate-y-1/2 flex items-center cursor-default w-[400px] ${part.align === 'left' ? 'flex-row right-6 justify-end' : 'flex-row-reverse left-6 justify-end'}`}
@@ -338,7 +331,6 @@ const Home = () => {
                             >
                                 <div className={`bg-white/95 backdrop-blur-md p-2 rounded-[2rem] shadow-2xl border border-white/50 animate-in fade-in zoom-in duration-300 flex items-center gap-4 ${part.align === 'left' ? 'flex-row' : 'flex-row-reverse text-right'}`}>
                                     <div className="flex flex-col justify-center min-w-[120px] px-2">
-                                        {/* Title Color: Orange #F39422 */}
                                         <h3 className="text-[#F39422] font-black text-lg md:text-xl uppercase leading-none mb-1">{part.title}</h3>
                                         <p className="text-[#010038]/70 text-xs font-medium leading-snug max-w-[150px]">{part.desc}</p>
                                     </div>
@@ -346,7 +338,6 @@ const Home = () => {
                                         <img src={part.img} alt={part.title} className="w-full h-full object-cover" />
                                     </div>
                                 </div>
-                                {/* Line Color: Orange #F39422 to match title */}
                                 <div className="w-8 md:w-16 h-[2px] bg-[#F39422] relative mx-2">
                                      <div className={`absolute w-1.5 h-1.5 bg-[#F39422] rounded-full top-1/2 -translate-y-1/2 ${part.align === 'left' ? '-left-1' : '-right-1'}`}></div>
                                 </div>
@@ -359,23 +350,19 @@ const Home = () => {
       </section>
 
       {/* =========================================================================
-          SECTION 3: COMPARE FEATURE (TIDAK BERUBAH)
+          SECTION 3: COMPARE FEATURE
       ========================================================================= */}
       <section ref={sec3Ref} className="relative w-full min-h-screen bg-gradient-to-br from-[#293A80] to-[#010038] flex items-center justify-center overflow-hidden py-20 px-6">
         
-        {/* Glow Effects */}
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#537EC5]/20 rounded-full blur-[120px] pointer-events-none mix-blend-screen"></div>
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-[#F39422]/10 rounded-full blur-[100px] pointer-events-none mix-blend-screen"></div>
-
-        {/* Noise Texture */}
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay pointer-events-none"></div>
 
         <div className="container max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center z-10">
           
-          {/* LEFT: VISUAL (Cards) */}
+          {/* LEFT: VISUAL */}
           <div className={`relative flex items-center justify-center h-[500px] perspective-1000 transition-all duration-1000 ease-out ${isSec3Visible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-20'}`}>
-            
-            {/* Card 1 (Belakang) */}
+            {/* Card 1 */}
             <div className="absolute left-4 md:left-10 top-10 w-[260px] md:w-[300px] bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-6 transform -rotate-6 transition-transform hover:rotate-0 hover:z-20 hover:scale-105 duration-500 shadow-xl">
                <div className="w-full h-32 bg-white/5 rounded-xl mb-4 flex items-center justify-center overflow-hidden border border-white/10">
                   <img src={shoeImg} alt="Shoe 1" className="w-full object-contain -rotate-12 brightness-110 drop-shadow-lg" />
@@ -389,23 +376,17 @@ const Home = () => {
                </div>
             </div>
 
-            {/* Card 2 (Depan) */}
+            {/* Card 2 */}
             <div className="absolute right-4 md:right-10 bottom-10 w-[260px] md:w-[300px] bg-[#293A80]/90 backdrop-blur-xl border border-[#537EC5]/50 rounded-3xl p-6 transform rotate-6 transition-transform hover:rotate-0 hover:scale-105 duration-500 shadow-[0_20px_50px_rgba(1,0,56,0.5)] z-10">
-               {/* Badge Winner: Orange #F39422 */}
-               <div className="absolute -top-4 -right-4 bg-[#F39422] text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg border border-orange-400/50 flex items-center gap-1">
-                  WINNER CHOICE
-               </div>
-               
+               <div className="absolute -top-4 -right-4 bg-[#F39422] text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg border border-orange-400/50 flex items-center gap-1">WINNER CHOICE</div>
                <div className="w-full h-32 bg-white/5 rounded-xl mb-4 flex items-center justify-center overflow-hidden border border-white/10 relative group">
                   <div className="absolute inset-0 bg-[#537EC5]/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                   <img src={shoeImg} alt="Shoe 2" className="w-full object-contain rotate-12 scale-x-[-1] brightness-110 drop-shadow-2xl relative z-10" />
                </div>
-               
                <div className="space-y-3">
                   <div className="h-3 w-2/3 bg-white/30 rounded-full"></div>
                   <div className="space-y-2 pt-2">
                       <div className="flex justify-between text-xs font-bold text-white"><span>CUSHION</span><span>95%</span></div>
-                      {/* Bar Gradient: Light Blue to Orange */}
                       <div className="w-full h-1.5 bg-[#010038]/50 rounded-full"><div className="w-[95%] h-full bg-gradient-to-r from-[#537EC5] to-[#F39422] rounded-full shadow-[0_0_15px_rgba(243,148,34,0.4)]"></div></div>
                   </div>
                </div>
@@ -445,37 +426,31 @@ const Home = () => {
       </section>
 
       {/* =========================================================================
-          SECTION 4: ABOUT RUSH (TIDAK BERUBAH)
+          SECTION 4: ABOUT RUSH
       ========================================================================= */}
       <section 
         ref={aboutRef}
         className="relative w-full py-24 bg-white overflow-hidden" 
       >
         <div className="container max-w-7xl mx-auto px-6">
-          
           <div className="relative flex flex-col md:flex-row items-center">
             
-            {/* 1. IMAGE LAYER (Behind) */}
-            {/* Gambar dibuat lebar dan tinggi, posisinya agak ke kiri */}
+            {/* 1. IMAGE LAYER */}
             <div className={`w-full md:w-3/5 h-[500px] md:h-[600px] relative rounded-[3rem] overflow-hidden shadow-2xl transition-all duration-1000 ease-out z-0
-               ${isAboutVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-20'}
+                ${isAboutVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-20'}
             `}>
                 <img 
                   src={sonixMemberImg} 
                   alt="About Rush" 
                   className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700 scale-105 hover:scale-100" 
                />
-               {/* Overlay Gradient biar teks (kalau ada) terbaca, atau sekadar estetika */}
                <div className="absolute inset-0 bg-gradient-to-r from-[#010038]/40 to-transparent mix-blend-multiply"></div>
             </div>
 
-            {/* 2. CONTENT CARD LAYER (Overlapping) */}
-            {/* Kartu putih ini posisinya absolut di kanan (md), menimpa gambar */}
+            {/* 2. CONTENT CARD LAYER */}
             <div className={`w-full md:w-1/2 md:-ml-20 lg:-ml-32 mt-[-100px] md:mt-0 relative z-10 bg-white/95 backdrop-blur-xl p-8 md:p-12 rounded-[2rem] shadow-[0_30px_60px_rgba(0,0,0,0.1)] border border-slate-100 transition-all duration-1000 delay-200 ease-out
-               ${isAboutVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'}
+                ${isAboutVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'}
             `}>
-               
-               {/* Decorative Element */}
                <div className="absolute top-0 right-0 p-8 opacity-10">
                   <svg width="80" height="80" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M0 50C0 22.3858 22.3858 0 50 0C77.6142 0 100 22.3858 100 50" stroke="#293A80" strokeWidth="8"/>
@@ -497,7 +472,6 @@ const Home = () => {
                   We believe finding the right shoe shouldn't be a marathon. RUSH uses data-driven insights to match your unique biomechanics with the perfect pair. No guesswork, just precision.
                </p>
 
-               {/* Stats / Features Grid */}
                <div className="grid grid-cols-2 gap-6 mb-8 border-t border-slate-100 pt-8">
                   <div>
                       <h4 className="text-3xl font-black text-[#293A80]">98%</h4>
@@ -517,9 +491,7 @@ const Home = () => {
                     </svg>
                   </span>
                </Link>
-
             </div>
-
           </div>
         </div>
       </section>
