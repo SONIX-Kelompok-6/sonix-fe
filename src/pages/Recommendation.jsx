@@ -188,22 +188,25 @@ export default function Recommendation() {
         return;
       }
 
-      // 🔥 2. HYDRATION: GABUNGKAN ID DENGAN DATA CONTEXT (SPEED BOOST) 🔥
+      // 🔥 PERBAIKAN DISINI 🔥
       const hydratedResults = mlList.map(mlItem => {
-          // MODIFIKASI: Handle jika mlItem adalah STRING (ID langsung) atau OBJECT
+          // LOGIC BARU: Cek apakah itemnya Object (Legacy) atau String (ID Baru)
           const targetId = typeof mlItem === 'object' ? (mlItem.id || mlItem.shoe_id) : mlItem;
           
+          // Debugging: Cek ID yang mau dicari
+          // console.log("Mencari ID:", targetId);
+
           // Cari di database local (allShoes)
-          // Cek string equality biar aman
+          // Pastikan kedua sisi dijadikan String agar aman
           const foundShoe = allShoes.find(s => 
               String(s.shoe_id) === String(targetId) || 
               String(s.slug) === String(targetId) ||
               String(s.id) === String(targetId)
           );
           
-          if (!foundShoe) console.warn(`⚠️ Shoe ID ${targetId} not found in Context.`);
+          if (!foundShoe) console.warn(`⚠️ Sepatu ID ${targetId} tidak ditemukan di Context.`);
           return foundShoe;
-      }).filter(item => item !== undefined);
+      }).filter(item => item !== undefined); // Hapus yang tidak ketemu
 
       console.log("✅ Final Results:", hydratedResults);
 
