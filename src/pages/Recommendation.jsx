@@ -375,7 +375,6 @@ export default function Recommendation() {
           {authError && (
             <div className="w-full bg-red-50 border border-red-100 text-red-600 font-medium py-3 px-4 rounded-xl text-center shadow-sm mb-6 text-xs flex flex-col items-center gap-2">
                 <span>{authError}</span>
-                <Link to="/login" className="px-4 py-1.5 bg-red-600 text-white text-[10px] font-bold rounded-full hover:bg-red-700 transition-colors">Go to Login</Link>
             </div>
           )}
 
