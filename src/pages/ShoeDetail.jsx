@@ -110,8 +110,17 @@ export default function ShoeDetail() {
   // --- HANDLERS ---
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
-    if (newReview.rating === 0 || newReview.text.trim() === "") return;
-    if (!token) { navigate('/login'); return; }
+    
+    // 🔥 Cek Login Dulu
+    if (!token) {
+        showNotification("Please login to submit a review 🔒");
+        return;
+    }
+
+    if (newReview.rating === 0 || newReview.text.trim() === "") {
+        showNotification("Please provide rating and text.");
+        return;
+    }
 
     const addedReview = {
         id: Date.now(), 
@@ -148,7 +157,11 @@ export default function ShoeDetail() {
   };
 
   const handleToggleFavorite = async () => {
-    if (!token) { navigate('/login'); return; }
+    // 🔥 Cek Login Dulu (Tanpa Redirect)
+    if (!token) {
+        showNotification("Please login to save favorites 🔒");
+        return;
+    }
 
     const previousStatus = shoeData.isFavorite;
     const newStatus = !previousStatus;
@@ -161,7 +174,7 @@ export default function ShoeDetail() {
     const updatedGlobalList = allShoes.map(s => s.shoe_id === shoeData.shoe_id ? { ...s, isFavorite: newStatus } : s);
     updateShoeState(updatedGlobalList); 
     
-    // 🔥 Show Notif
+    // Show Notif
     showNotification(newStatus ? "Added to Favorites ❤️" : "Removed from Favorites 💔");
 
     try {
@@ -175,6 +188,12 @@ export default function ShoeDetail() {
   };
 
   const handleAddCompare = () => {
+    // 🔥 Cek Login Dulu
+    if (!token) {
+        showNotification("Please login to use comparison 🔒");
+        return;
+    }
+
     if (!shoeData) return;
     let compareList = JSON.parse(localStorage.getItem("compareList")) || [];
 
@@ -196,7 +215,7 @@ export default function ShoeDetail() {
     compareList.push(shoeToSave);
     localStorage.setItem("compareList", JSON.stringify(compareList));
     
-    // 🔥 Show Notif
+    // Show Notif
     showNotification(`Added "${shoeToSave.name}" to comparison.`);
   };
 
@@ -259,7 +278,7 @@ export default function ShoeDetail() {
                 </div>
                 <button 
                   onClick={handleAddCompare} 
-                  className="bg-[#0a0a5c] text-white px-8 py-3 rounded-full font-bold hover:bg-blue-900 transition-colors cursor-pointer"
+                  className="bg-[#0a0a5c] text-white px-8 py-3 rounded-full font-bold hover:bg-blue-900 transition-colors"
                 >
                   Compare
                 </button>
@@ -268,7 +287,7 @@ export default function ShoeDetail() {
           </div>
         </div>
 
-        {/* TECH SPECS SECTION (EXPANDED FORMAT) */}
+        {/* TECH SPECS SECTION */}
         <div className="mt-12">
           <h2 className="text-3xl font-black text-white text-center mb-8 tracking-widest uppercase">Specification</h2>
           <div className="bg-white rounded-3xl p-8 shadow-2xl border border-gray-100">
