@@ -18,7 +18,8 @@ import heelImg from '../assets/home-images/heel-counter.png';
 import outsoleImg from '../assets/home-images/outsole.png';
 import midsoleImg from '../assets/home-images/midsole.png';
 import toeboxImg from '../assets/home-images/toebox.png';
-import sonixMemberImg from '../assets/home-images/sonix-member.png';
+import sonixMemberImg from '../assets/home-images/aboutrush.jpeg';
+
 
 const Home = () => {
   const navigate = useNavigate();
@@ -537,7 +538,7 @@ const Home = () => {
                 <img 
                   src={sonixMemberImg} 
                   alt="About Rush" 
-                  className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700 scale-105 hover:scale-100" 
+                  className="w-full h-full object-cover transition-all duration-700 scale-105 hover:scale-100" 
                />
                <div className="absolute inset-0 bg-gradient-to-r from-[#010038]/40 to-transparent mix-blend-multiply"></div>
             </div>
@@ -570,7 +571,7 @@ const Home = () => {
                <div className="grid grid-cols-2 gap-6 mb-8 border-t border-slate-100 pt-8">
                   <div>
                       <h4 className="text-3xl font-black text-[#293A80]">98%</h4>
-                      <p className="text-sm text-slate-500 font-medium">Match Accuracy</p>
+                      <p className="text-sm text-slate-500 font-medium">Up To Match Accuracy</p>
                   </div>
                   <div>
                       <h4 className="text-3xl font-black text-[#293A80]">50+</h4>
