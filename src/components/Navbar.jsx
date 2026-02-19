@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios"; 
 import logoImg from '../assets/logo-dark.svg'; 
+import { useShoes } from "../context/ShoeContext";
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -13,6 +14,7 @@ export default function Navbar() {
   const isAuthenticated = !!localStorage.getItem("userToken");
 
   const [username, setUsername] = useState("");
+  const { refreshShoes } = useShoes();
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -49,11 +51,15 @@ export default function Navbar() {
         });
       }
     } catch (error) {
-      console.error("Logout backend error:", error);
+      console.error("Logout error:", error);
     } finally {
       localStorage.removeItem("userToken");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("userEmail");
+      localStorage.removeItem("userName");
+      localStorage.removeItem("compareList"); 
+      refreshShoes(); 
       navigate("/login");
-      window.location.reload();
     }
   };
 

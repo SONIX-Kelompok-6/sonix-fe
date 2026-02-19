@@ -49,8 +49,8 @@ export default function Footer() {
                 </li>
 
                 <li>
-                <Link to="/favorite" className="hover:text-white transition">
-                    Favorite
+                <Link to="/favorites" className="hover:text-white transition">
+                    Favorites
                 </Link>
                 </li>
 

@@ -68,20 +68,24 @@ export default function Account() {
     fetchUserProfile();
   }, [navigate]);
 
-  const handleLogout = async () => {
+const handleLogout = async () => {
     const token = localStorage.getItem("userToken");
     try {
       if (token) {
-        await api.post('/api/logout/', {}, {
+        await api.post("/api/logout/", {}, {
           headers: { 'Authorization': `Token ${token}` }
         });
       }
     } catch (error) {
-      console.error("Logout error", error);
+      console.error("Logout error:", error);
     } finally {
       localStorage.removeItem("userToken");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("userEmail");
+      localStorage.removeItem("userName");
+      localStorage.removeItem("compareList");
+      refreshShoes(); 
       navigate("/login");
-      window.location.reload();
     }
   };
 

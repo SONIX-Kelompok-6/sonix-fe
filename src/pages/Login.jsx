@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom"; 
-// Gunakan instance api yang sudah disetting (otomatis connect Railway)
+import { useShoes } from "../context/ShoeContext";
 import api from "../api/axios"; 
 
 export default function Login() {
   const navigate = useNavigate(); 
 
+  const { refreshShoes } = useShoes();
+
   const [formData, setFormData] = useState({
-    identifier: "", // identifier bisa berupa email atau username
+    identifier: "", 
     password: ""
   });
   const [error, setError] = useState(""); 
@@ -52,6 +54,8 @@ export default function Login() {
       if(response.data.username){
           localStorage.setItem("userName", response.data.username);
       }
+
+      refreshShoes();
 
       // Logic Redirect
       // Cek apakah backend mengirim field 'has_profile'
