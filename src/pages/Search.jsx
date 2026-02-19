@@ -28,11 +28,11 @@ export default function Search() {
       // CLEANUP: Kalau ada notif baru sebelum 3 detik, timer lama DIMATIKAN
       return () => clearTimeout(timer);
     }
-  }, [notification]); // Jalan setiap kali 'notification' berubah
+  }, [notification]);
 
   // --- HELPER ---
   const showNotification = (message) => {
-    setNotification(message); // Cukup set state, useEffect yang urus timer
+    setNotification(message);
   };
 
   // --- LOGIC FILTERING & SORTING ---
@@ -66,10 +66,10 @@ export default function Search() {
     const token = localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId"); 
 
+    // 🔥 CEK LOGIN DULU (TANPA REDIRECT)
     if (!token) {
-      // showNotification("Please login to save favorites."); // Opsional: kasih tau dulu sblm redirect
-      navigate('/login'); 
-      return;
+      showNotification("Please login to save favorites 🔒");
+      return; // Stop di sini
     }
 
     const interactionValue = shoe.isFavorite ? 0 : 1;
@@ -81,7 +81,7 @@ export default function Search() {
     );
     updateShoeState(updatedList); 
     
-    // 🔥 Show Notification
+    // Show Notification
     showNotification(isNowFavorite ? "Added to Favorites ❤️" : "Removed from Favorites 💔");
 
     try {
@@ -101,6 +101,14 @@ export default function Search() {
 
   // --- ADD TO COMPARE ---
   const handleAddCompare = (shoe) => {
+    // 🔥 1. CEK LOGIN DULU (SAMA KAYA FAVORITE)
+    const token = localStorage.getItem("userToken");
+    if (!token) {
+        showNotification("Please login to use comparison 🔒");
+        return; // Stop di sini, jangan lanjut ke bawah
+    }
+
+    // 2. Logic Compare Biasa
     let compareList = JSON.parse(localStorage.getItem("compareList")) || [];
 
     // Cek Duplikat
@@ -125,7 +133,7 @@ export default function Search() {
     compareList.push(shoeToSave);
     localStorage.setItem("compareList", JSON.stringify(compareList));
 
-    // 🔥 Show Success Notification
+    // Show Success Notification
     showNotification(`Added "${shoe.name}" to comparison.`);
   };
 
