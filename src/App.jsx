@@ -19,6 +19,7 @@ import Search from "./pages/Search";
 import Compare from "./pages/Compare";
 import Account from "./pages/Account";
 import Contact from "./pages/Contact";
+import ComingSoon from "./pages/ComingSoon";
 
 export default function App() {
   const location = useLocation();
@@ -30,6 +31,7 @@ export default function App() {
     "/create-profile", 
     "/forgot-password", 
     "/update-password",
+    "/coming-soon",
   ];
 
   const hideFooterRoutes = [
@@ -77,6 +79,7 @@ export default function App() {
           <Route path="/compare" element={<Compare />} />
           <Route path="/account" element={<Account />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/coming-soon" element={<ComingSoon />} />
 
 
           <Route path="*" element={<div className="text-center font-bold mt-10">404 - Page Not Found</div>} />

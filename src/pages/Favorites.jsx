@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react"; 
-import { Link, useNavigate } from "react-router-dom"; 
+import { Link, useNavigate, useLocation } from "react-router-dom"; 
 import { sendInteraction } from "../services/SonixMl";
 import api from "../api/axios";
 import { useShoes } from "../context/ShoeContext"; 
 
 export default function Favorites() {
   const { allShoes, updateShoeState } = useShoes();
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
+  const location = useLocation();
   
   // 🔥 STATE BARU: AUTH ERROR
   const [authError, setAuthError] = useState(null);
@@ -23,6 +24,18 @@ export default function Favorites() {
         setAuthError(null);
     }
   }, []);
+
+  // --- RESET LISTENER DARI NAVBAR ---
+  useEffect(() => {
+    // Mengecek apakah ada sinyal 'reset' dari navigasi
+    if (location.state && location.state.reset) {
+      // Gulir layar ke paling atas dengan animasi mulus
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      
+      // Bersihkan sinyalnya agar tidak terus-terusan di-reset
+      navigate("/favorites", { replace: true, state: {} });
+    }
+  }, [location, navigate]);
 
   const handleRemoveFavorite = async (e, shoeId) => {
     e.preventDefault();

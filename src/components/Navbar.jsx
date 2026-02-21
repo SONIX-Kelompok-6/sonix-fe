@@ -34,13 +34,17 @@ export default function Navbar() {
   const userImage = `https://ui-avatars.com/api/?name=${username}&background=0D8ABC&color=fff&bold=true`; 
 
   const handleSearch = (e) => {
-    if (e.key === 'Enter' && searchQuery.trim() !== "") {
-      navigate(`/search?q=${searchQuery}`);
-      setSearchQuery(""); 
-      // Tutup menu mobile jika search dilakukan dari mobile menu
-      setIsMenuOpen(false);
-    }
-  };
+      if (e.key === 'Enter' && searchQuery.trim() !== "") {
+        
+        // 🔥 TAMBAHKAN BARIS INI UNTUK SCROLL KE ATAS
+        window.scrollTo({ top: 0, behavior: "smooth" }); 
+
+        navigate(`/search?q=${searchQuery}`);
+        setSearchQuery(""); 
+        // Tutup menu mobile jika search dilakukan dari mobile menu
+        setIsMenuOpen(false);
+      }
+    };
 
   const handleLogout = async () => {
     const token = localStorage.getItem("userToken");
@@ -58,6 +62,7 @@ export default function Navbar() {
       localStorage.removeItem("userEmail");
       localStorage.removeItem("userName");
       localStorage.removeItem("compareList"); 
+      sessionStorage.removeItem("rush_rec_state");
       refreshShoes(); 
       navigate("/login");
     }
@@ -76,11 +81,11 @@ export default function Navbar() {
   }, [dropdownRef]);
 
   const menuItems = [
-    { name: "Home", path: "/" },
-    { name: "Recommendation", path: "/recommendation" },
-    { name: "Compare", path: "/compare" },
-    { name: "Favorites", path: "/favorites" },
-    { name: "About", path: "/about" },
+    { name: "Home", path: "/" , state: { reset: true } },
+    { name: "Recommendation", path: "/recommendation" , state: { reset: true } },
+    { name: "Compare", path: "/compare", state: { reset: true } },
+    { name: "Favorites", path: "/favorites", state: { reset: true } },
+    { name: "About", path: "/about" , state: { reset: true } },
   ];
 
   return (
@@ -104,6 +109,7 @@ export default function Navbar() {
             <Link
               key={item.name}
               to={item.path}
+              state={item.state}
               className="text-sm font-semibold text-gray-600 transition hover:text-blue-600 hover:underline hover:underline-offset-4"
             >
               {item.name}
@@ -221,6 +227,7 @@ export default function Navbar() {
                 <Link
                   key={item.name}
                   to={item.path}
+                  state={item.state}
                   onClick={() => setIsMenuOpen(false)}
                   className="block rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-blue-50 hover:text-blue-600"
                 >
