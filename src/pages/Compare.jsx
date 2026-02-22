@@ -351,8 +351,16 @@ export default function Compare() {
 
   // --- FILTER & SORTING MODAL ---
   let filteredShoes = allShoesDb.filter(
-    dbShoe => !selectedShoes.find(s => s.shoe_id === dbShoe.shoe_id) && 
-              dbShoe.name.toLowerCase().includes(searchQuery.toLowerCase())
+    dbShoe => {
+      const isNotSelected = !selectedShoes.find(s => s.shoe_id === dbShoe.shoe_id);
+      const query = searchQuery.toLowerCase();
+      
+      // Cek apakah query ada di Nama ATAU di Brand
+      const matchName = dbShoe.name && dbShoe.name.toLowerCase().includes(query);
+      const matchBrand = dbShoe.brand && dbShoe.brand.toLowerCase().includes(query);
+      
+      return isNotSelected && (matchName || matchBrand);
+    }
   );
 
   filteredShoes.sort((a, b) => {
