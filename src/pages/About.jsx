@@ -1,9 +1,25 @@
-import React from "react";
+import React, { useState , useEffect} from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import tornPaper from "../assets/about-page/torn-paper.png";
 import rushLogo from "../assets/about-page/logo-dark1.svg";
 
 
 export default function About() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  // --- RESET LISTENER DARI NAVBAR ---
+  useEffect(() => {
+    // Mengecek apakah ada sinyal 'reset' dari navigasi
+    if (location.state && location.state.reset) {
+      // Gulir layar ke paling atas dengan animasi mulus
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      
+      // Bersihkan sinyalnya agar tidak terus-terusan di-reset
+      navigate("/about", { replace: true, state: {} });
+    }
+  }, [location, navigate]);
+
+
   return (
     <div className="pt-55 pb-5">
       {/* LOGO */}

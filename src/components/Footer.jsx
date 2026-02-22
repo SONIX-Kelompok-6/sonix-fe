@@ -1,9 +1,9 @@
 import logoImg from '../assets/logo-light.svg'; 
-
 import igIcon from "../assets/footer/instagram.png";
 import xIcon from "../assets/footer/x.png";
 import fbIcon from "../assets/footer/facebook.png";
 import ytIcon from "../assets/footer/youtube.png";
+
 
 import { Link } from "react-router-dom";
 
@@ -84,19 +84,19 @@ export default function Footer() {
 
             {/* Icon dibuat putih total agar terlihat di background biru gelap */}
             <div className="flex gap-4 items-center">
-                <a href="#" className="hover:scale-110 transition">
+                <a href="/coming-soon" className="hover:scale-110 transition">
                 <img src={igIcon} alt="Instagram" className="h-6 w-6 object-contain brightness-0 invert" />
                 </a>
 
-                <a href="#" className="hover:scale-110 transition">
+                <a href="/coming-soon" className="hover:scale-110 transition">
                 <img src={xIcon} alt="X" className="h-6 w-6 object-contain brightness-0 invert" />
                 </a>
 
-                <a href="#" className="hover:scale-110 transition">
+                <a href="/coming-soon" className="hover:scale-110 transition">
                 <img src={fbIcon} alt="Facebook" className="h-6 w-6 object-contain brightness-0 invert" />
                 </a>
 
-                <a href="#" className="hover:scale-110 transition">
+                <a href="/coming-soon" className="hover:scale-110 transition">
                 <img src={ytIcon} alt="YouTube" className="h-6 w-6 object-contain brightness-0 invert" />
                 </a>
             </div>

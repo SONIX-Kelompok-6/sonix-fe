@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 // --- IMPORT SERVICE ML ---
 import { getUserFeed } from "../services/SonixMl"; 
@@ -23,7 +23,7 @@ import sonixMemberImg from '../assets/home-images/aboutrush.jpeg';
 
 const Home = () => {
   const navigate = useNavigate();
-  
+  const location = useLocation();
   // --- 1. AMBIL GUDANG DATA (CONTEXT) ---
   const { allShoes } = useShoes(); 
 
@@ -45,6 +45,18 @@ const Home = () => {
 
   const [isAboutVisible, setIsAboutVisible] = useState(false); // About
   const aboutRef = useRef(null);
+
+//   scroll to top on navigate with state reset
+  useEffect(() => {
+    // Kalau ada sinyal reset dari Navbar
+    if (location.state && location.state.reset) {
+      // Gulir layar ke paling atas dengan animasi mulus
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      
+      // Bersihkan sinyalnya agar tidak terus-terusan di-reset
+      navigate("/", { replace: true, state: {} });
+    }
+  }, [location, navigate]);
 
 // --- 2. FETCH & HYDRATE FEED DATA ---
   useEffect(() => {

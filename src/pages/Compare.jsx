@@ -320,6 +320,18 @@ export default function Compare() {
     fetchData();
   }, [navigate]); 
 
+  // --- RESET LISTENER DARI NAVBAR ---
+  useEffect(() => {
+    // Mengecek apakah ada sinyal 'reset' dari navigasi
+    if (location.state && location.state.reset) {
+      // Gulir layar ke paling atas dengan animasi mulus
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      
+      // Bersihkan sinyalnya agar tidak terus-terusan di-reset
+      navigate("/compare", { replace: true, state: {} });
+    }
+  }, [location, navigate]);
+
   // --- HANDLERS ---
   const handleAddShoe = (shoe) => {
     if (selectedShoes.length < 5) {
@@ -544,7 +556,7 @@ export default function Compare() {
                   return (
                     <div key={shoe.shoe_id} onClick={() => handleAddShoe(shoe)} className={`flex items-center gap-4 p-3 mb-2 rounded-xl border shadow-sm cursor-pointer transition-all group ${isFav ? 'bg-yellow-50 border-yellow-200 hover:border-yellow-400' : 'bg-white border-gray-100 hover:border-orange-300 hover:shadow-md'}`}>
                       <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center p-1 border border-gray-200 relative">
-                          <img src={shoe['img-url'] || shoe.mainImage || "https://placehold.co/100x100?text=No+Image"} alt={shoe.name} className="max-h-full object-contain mix-blend-multiply" />
+                          <img src={shoe.img_url || "https://placehold.co/100x100?text=No+Image"} alt={shoe.name} className="max-h-full object-contain mix-blend-multiply" />
                           {isFav && <span className="absolute -top-2 -right-2 text-yellow-400 drop-shadow-sm text-lg">★</span>}
                       </div>
                       <div className="flex-1">

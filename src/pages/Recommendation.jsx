@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import api from "../api/axios"; 
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { getRecommendations, sendInteraction, getUserFeed } from "../services/SonixMl";
 import { useShoes } from "../context/ShoeContext"; 
 
@@ -34,6 +34,7 @@ const gridStyle = {
 
 export default function Recommendation() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { allShoes, updateShoeState, isLoading: isContextLoading } = useShoes();
 
   // --- STATES ---
@@ -76,8 +77,18 @@ export default function Recommendation() {
   useEffect(() => {
     try {
       const savedState = sessionStorage.getItem("rush_rec_state");
+      const currentUserId = localStorage.getItem("userId"); // Ambil ID user yang login saat ini
+
       if (savedState) {
         const parsed = JSON.parse(savedState);
+
+        // CEK PENTING: Apakah state ini milik user yang sedang login?
+        // Jika berbeda (atau jika currentUserId null karena belum login), JANGAN di-load!
+        if (parsed.savedUserId !== currentUserId) {
+            sessionStorage.removeItem("rush_rec_state");
+            return; 
+        }
+
         setCommonData(parsed.commonData);
         setRoadData(parsed.roadData);
         setTrailData(parsed.trailData);
@@ -91,13 +102,39 @@ export default function Recommendation() {
     }
   }, []);
 
+  // --- RESET LISTENER DARI NAVBAR ---
+  useEffect(() => {
+    // Mengecek apakah ada sinyal 'reset' dari navigasi
+    if (location.state && location.state.reset) {
+      
+      // 1. Hapus memori session
+      sessionStorage.removeItem("rush_rec_state");
+      
+      // 2. Kembalikan semua state ke kondisi awal (Menu)
+      setStep("menu");
+      setCommonData({ footWidth: null, archType: null, orthotics: null });
+      setRoadData({ purpose: null, pace: null, cushion: null, season: null, stability: null, strike: null });
+      setTrailData({ terrain: null, pace: null, season: null, strike: null, waterResistant: null, rockSensitivity: null });
+      setSearchResults([]);
+      
+      // 3. scroll ke atas 
+      window.scrollTo({ top: 0, behavior: "smooth" });
+
+      // 4. Bersihkan sinyal reset dari URL agar kalau di-refresh tidak kereset lagi
+      navigate("/recommendation", { replace: true, state: {} });
+    }
+  }, [location, navigate]);
+
   const saveStateToStorage = (currentStep, results = searchResults) => {
+    const currentUserId = localStorage.getItem("userId");
+
     const stateToSave = {
         step: currentStep,
         results: results,
         commonData,
         roadData,
-        trailData
+        trailData,
+        savedUserId: currentUserId,
     };
     sessionStorage.setItem("rush_rec_state", JSON.stringify(stateToSave));
   };
@@ -622,8 +659,9 @@ export default function Recommendation() {
                 {step === "road" && <SelectionGroup label="Cushion Preference (Optional)" options={['Soft', 'Balanced', 'Firm']} category="cushion" />}
                 <SelectionGroup label="Season (Optional)" options={['Summer', 'Spring & Fall', 'Winter']} category="season" />
                 {step === "road" && (<div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Stability Need (Optional)</label><div className="flex gap-2 w-full md:w-2/3">{['Neutral', 'Guided'].map(s => (<button key={s} onClick={() => handleToggleSelect('stability', s)} className={`flex-1 py-2 rounded-xl text-[12px] border-2 transition-all ${roadData.stability === s ? activeStyle : inactiveStyle}`}>{s}</button>))}</div></div>)}
-                <div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Strike pattern (Optional)</label><div className="flex flex-wrap gap-4 text-[12px]">{['Heel', 'Mid', 'Forefoot'].map(s => {const currentStrike = step === "road" ? roadData.strike : trailData.strike;return (<button key={s} onClick={() => handleToggleSelect('strike', s)} className="flex items-center gap-2 group"><div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${currentStrike === s ? 'border-blue-600 bg-blue-50' : 'border-gray-300 group-hover:border-blue-400'}`}>{currentStrike === s && <div className="w-2 h-2 bg-blue-600 rounded-full"></div>}</div><span className={currentStrike === s ? 'text-blue-900 font-bold' : 'text-gray-700 font-bold'}>{s}</span></button>);})}</div></div>
-                {step === "trail" && (<><div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Water Resistant (Optional)</label><div className="flex flex-wrap gap-4 text-[12px]">{['Waterproof', 'Water Repellent'].map(w => (<button key={w} onClick={() => handleToggleSelect('waterResistant', w)} className="flex items-center gap-2 group"><div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${trailData.waterResistant === w ? 'border-blue-600 bg-blue-50' : 'border-gray-300 group-hover:border-blue-400'}`}>{trailData.waterResistant === w && <span className="text-blue-600 text-[10px]">✓</span>}</div><span className={trailData.waterResistant === w ? 'text-blue-900 font-bold' : 'text-gray-700 font-bold'}>{w}</span></button>))}</div></div><div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Rock Sensitivity (Optional)</label><div className="flex gap-4 text-[12px]">{['Yes', 'No'].map(r => (<button key={r} onClick={() => handleToggleSelect('rockSensitivity', r)} className="flex items-center gap-2 group"><div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${trailData.rockSensitivity === r ? 'border-blue-600 bg-blue-50' : 'border-gray-300 group-hover:border-blue-400'}`}>{trailData.rockSensitivity === r && <span className="text-blue-600 text-[10px]">✓</span>}</div><span className={trailData.rockSensitivity === r ? 'text-blue-900 font-bold' : 'text-gray-700 font-bold'}>{r}</span></button>))}</div></div></>)}
+                <div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Strike pattern (Optional)</label><div className="flex gap-2 w-full">{['Heel', 'Mid', 'Forefoot'].map(s => {const currentStrike = step === "road" ? roadData.strike : trailData.strike;return (<button key={s} onClick={() => handleToggleSelect('strike', s)} className={`flex-1 py-2 rounded-xl text-[12px] border-2 transition-all ${currentStrike === s ? activeStyle : inactiveStyle}`}>{s}</button>);})}</div></div>
+                {step === "trail" && (<><div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Water Resistant (Optional)</label><div className="flex gap-2 w-full">{['Waterproof', 'Water Repellent'].map(w => (<button key={w} onClick={() => handleToggleSelect('waterResistant', w)} className={`flex-1 py-2 rounded-xl text-[12px] border-2 transition-all ${trailData.waterResistant === w ? activeStyle : inactiveStyle}`}>{w}</button>))}</div></div>
+                <div className="mb-4 text-left"><label className="block text-sm font-bold mb-2 uppercase text-gray-800">Rock Sensitivity (Optional)</label><div className="flex gap-2 w-full">{['Yes', 'No'].map(r => (<button key={r} onClick={() => handleToggleSelect('rockSensitivity', r)} className={`flex-1 py-2 rounded-xl text-[12px] border-2 transition-all ${trailData.rockSensitivity === r ? activeStyle : inactiveStyle}`}>{r}</button>))}</div></div></>)}
             </div>
         )}
       </div>
