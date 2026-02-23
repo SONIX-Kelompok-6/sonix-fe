@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useShoes } from "../context/ShoeContext";
 import api from "../api/axios"; 
 
 export default function Account() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const { refreshShoes } = useShoes();
   
   const [userData, setUserData] = useState({
     username: "-",
@@ -68,7 +70,7 @@ export default function Account() {
     fetchUserProfile();
   }, [navigate]);
 
-const handleLogout = async () => {
+  const handleLogout = async () => {
     const token = localStorage.getItem("userToken");
     try {
       if (token) {
@@ -83,7 +85,8 @@ const handleLogout = async () => {
       localStorage.removeItem("userId");
       localStorage.removeItem("userEmail");
       localStorage.removeItem("userName");
-      localStorage.removeItem("compareList");
+      localStorage.removeItem("compareList"); 
+      sessionStorage.removeItem("rush_rec_state");
       refreshShoes(); 
       navigate("/login");
     }
